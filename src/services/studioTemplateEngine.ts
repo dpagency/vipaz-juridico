@@ -88,5 +88,8 @@ export async function renderStudioDocx(file: Blob, data: StudioData): Promise<Bl
   });
   if (warnings.length) throw new Error([...new Set(warnings)].join('\n'));
   zip.file('word/document.xml', output);
-  return new Blob([await zip.generateAsync({ type: 'uint8array' })], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  const bytes = await zip.generateAsync({ type: 'uint8array' });
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 }
