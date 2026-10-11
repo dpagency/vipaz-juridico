@@ -53,6 +53,13 @@ export async function renderStudioDocx(file: Blob, data: StudioData): Promise<Bl
   const entry = zip.file('word/document.xml');
   if (!entry) throw new Error('DOCX inválido: documento principal ausente');
   const xml = await entry.async('string');
+  // Fail closed: legacy Carbone loops and conditions need explicit migration.
+  // Silently dropping legal paragraphs could change the meaning of a pleading.
+  const unsupported = inspectStudioXml(xml).filter(marker => marker.kind !== 'field');
+  if (unsupported.length) {
+    throw new Error('Modelo contém condições ou repetições Carbone ainda não homologadas: ' +
+      unsupported.map(marker => '{d.' + marker.expression + '}').join(', '));
+  }
   const warnings: string[] = [];
   const output = xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, paragraph => {
     const text = textOf(paragraph);
