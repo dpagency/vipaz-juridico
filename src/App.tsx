@@ -12,6 +12,7 @@ import { CaseWorkspaceView } from './views/case-workspace/CaseWorkspaceView';
 import { BibliotecaView } from './views/BibliotecaView';
 import { IndicadoresView } from './views/IndicadoresView';
 import { AdminToolsView } from './views/AdminToolsView';
+import { StudioView } from './views/StudioView';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ShieldAlert, LogOut, ArrowRight, Loader2 } from 'lucide-react';
 
@@ -318,6 +319,17 @@ function AppContent() {
             organization={currentOrg}
             onNavigate={navigate}
           />
+        </AppShell>
+      );
+    }
+
+    // VIPAZ Studio experimental workspace, accessible only to authenticated tenant members.
+    const studioMatch = currentPath.match(/^\/app\/([a-zA-Z0-9_-]+)\/studio$/);
+    if (studioMatch) {
+      return (
+        <AppShell currentPath={currentPath} onNavigate={navigate} organization={currentOrg}
+          user={session.user} onLogout={handleLogout} onSwitchTenant={handleSwitchTenant}>
+          <StudioView />
         </AppShell>
       );
     }
