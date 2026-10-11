@@ -15,12 +15,14 @@ import {
   Packer,
 } from 'docx';
 import { ResolvedDocumentAssembly } from '../domain/legal-engine/types.js';
+import { resolveVipazStudioTheme, type VipazStudioTheme } from './vipazStudioTheme.js';
 
 export class DocumentRenderer {
   /**
    * Converte a montagem jurídica resolvida em um documento DOCX profissional (Blob)
    */
-  async renderToDocxBlob(assembly: ResolvedDocumentAssembly): Promise<Blob> {
+  async renderToDocxBlob(assembly: ResolvedDocumentAssembly, themeOverrides: Partial<VipazStudioTheme> = {}): Promise<Blob> {
+    const theme = resolveVipazStudioTheme(themeOverrides);
     const paragraphs: Paragraph[] = [];
 
     for (let i = 0; i < assembly.includedBlocks.length; i++) {
@@ -90,7 +92,7 @@ export class DocumentRenderer {
                   text: trimmed,
                   bold: true,
                   size: 24, // 12pt
-                  font: 'Arial',
+                  font: theme.fontFamily,
                   color: '0F172A',
                 }),
               ],
@@ -108,7 +110,7 @@ export class DocumentRenderer {
                   text: trimmed,
                   italics: true,
                   size: 20, // 10pt
-                  font: 'Arial',
+                  font: theme.fontFamily,
                   color: '334155',
                 }),
               ],
@@ -124,7 +126,7 @@ export class DocumentRenderer {
                 new TextRun({
                   text: trimmed,
                   size: 24,
-                  font: 'Arial',
+                  font: theme.fontFamily,
                   color: '0F172A',
                 }),
               ],
@@ -140,7 +142,7 @@ export class DocumentRenderer {
                   text: trimmed,
                   bold: true,
                   size: 24,
-                  font: 'Arial',
+                  font: theme.fontFamily,
                   color: '0F172A',
                 }),
               ],
@@ -159,7 +161,7 @@ export class DocumentRenderer {
                   text: trimmed,
                   bold: true,
                   size: 24,
-                  font: 'Arial',
+                  font: theme.fontFamily,
                   color: '0F172A',
                 }),
               ],
@@ -179,7 +181,7 @@ export class DocumentRenderer {
                   text: trimmed,
                   bold: true,
                   size: 22,
-                  font: 'Arial',
+                  font: theme.fontFamily,
                   color: '0F172A',
                 }),
               ],
@@ -194,7 +196,7 @@ export class DocumentRenderer {
                 new TextRun({
                   text: trimmed,
                   size: 20,
-                  font: 'Arial',
+                  font: theme.fontFamily,
                   color: '475569',
                 }),
               ],
@@ -211,7 +213,7 @@ export class DocumentRenderer {
                 new TextRun({
                   text: trimmed,
                   size: 24, // 12pt
-                  font: 'Arial',
+                  font: theme.fontFamily,
                   color: '0F172A',
                 }),
               ],
@@ -223,14 +225,14 @@ export class DocumentRenderer {
 
     // Cria o documento com cabeçalho e rodapé forense do escritório CAW
     const doc = new Document({
-      creator: 'VIPAZ Jurídico — CAW Advogados Associados',
+      creator: theme.organizationName,
       title: `${assembly.architecture.documentPiece} - ${assembly.resolvedVariables.PROCESS_NUMBER || 'Peça'}`,
       description: 'Peça processual montada pelo Motor Determinístico VIPAZ Jurídico',
       styles: {
         default: {
           document: {
             run: {
-              font: 'Arial',
+              font: theme.fontFamily,
               size: 24,
               color: '0F172A',
             },
@@ -257,11 +259,11 @@ export class DocumentRenderer {
                   spacing: { after: 120 },
                   children: [
                     new TextRun({
-                      text: 'CORBO, AGUIAR & WAISE ADVOGADOS ASSOCIADOS',
+                      text: theme.headerText,
                       bold: true,
                       size: 16, // 8pt
                       color: '64748B',
-                      font: 'Arial',
+                      font: theme.fontFamily,
                     }),
                   ],
                 }),
@@ -276,28 +278,28 @@ export class DocumentRenderer {
                   spacing: { before: 120 },
                   children: [
                     new TextRun({
-                      text: 'Página ',
+                      text: theme.footerText + ' | Página ',
                       size: 16,
                       color: '94A3B8',
-                      font: 'Arial',
+                      font: theme.fontFamily,
                     }),
                     new TextRun({
                       children: [PageNumber.CURRENT],
                       size: 16,
                       color: '94A3B8',
-                      font: 'Arial',
+                      font: theme.fontFamily,
                     }),
                     new TextRun({
                       text: ' de ',
                       size: 16,
                       color: '94A3B8',
-                      font: 'Arial',
+                      font: theme.fontFamily,
                     }),
                     new TextRun({
                       children: [PageNumber.TOTAL_PAGES],
                       size: 16,
                       color: '94A3B8',
-                      font: 'Arial',
+                      font: theme.fontFamily,
                     }),
                   ],
                 }),
