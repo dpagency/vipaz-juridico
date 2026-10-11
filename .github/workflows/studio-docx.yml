@@ -2,7 +2,11 @@ name: VIPAZ Studio DOCX smoke test
 on:
   push:
     branches:
-      - security/backend-generation-webhook
+      - main
+      - 'feat/**'
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 jobs:
   studio-docx:
