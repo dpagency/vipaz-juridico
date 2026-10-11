@@ -49,7 +49,7 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
       process.env.SUPABASE_ANON_KEY ||
       '';
 
-    const token = /^Bearer\\s+(.+)$/i.exec(authHeader || '')?.[1];
+    const token = /^Bearer\s+(.+)$/i.exec(authHeader || '')?.[1];
     if (!token) { res.status(401).json({ success: false, error: 'Autenticação necessária.' }); return; }
     if (!supabaseUrl || !supabaseAnonKey) { res.status(503).json({ success: false, error: 'Supabase não configurado.' }); return; }
     const client = createClient(supabaseUrl, supabaseAnonKey, {
