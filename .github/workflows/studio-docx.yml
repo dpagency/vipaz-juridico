@@ -16,4 +16,10 @@ jobs:
           node-version: '22'
       - run: npm install --no-audit --no-fund
       - run: npm run test:studio
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: vipaz-studio-contestacao-docx
+          path: artifacts/vipaz-studio-contestacao-ficticia.docx
+          if-no-files-found: error
       - run: npm run lint
