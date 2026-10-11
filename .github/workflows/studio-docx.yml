@@ -15,7 +15,13 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
-      - run: npm run test:studio
+      - name: Build frontend and server
+        run: npm run build
+      - name: Generate fictional DOCX without external services
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: test-public-key-not-a-secret
+        run: npm run test:studio
       - uses: actions/upload-artifact@v4
         if: success()
         with:
