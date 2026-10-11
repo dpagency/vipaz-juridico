@@ -15,22 +15,12 @@
 
 import { Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase.js';
 import {
   assembleDocumentFromSnapshot,
-  getPhase41HomologatedSnapshot,
-  loadCaseSnapshot,
-  OFFICIAL_HOMOLOGATED_JOB_ID,
-  OFFICIAL_HOMOLOGATED_INPUT_ID,
 } from '../services/experimentalDocxService.js';
 import { buildCawDocxPayload } from '../domain/legal-engine/documentPayloadMapper.js';
 import { PersistedLegalCaseInput } from '../domain/legal-engine/caseDataMapper.js';
 
-const DEFAULT_N8N_DOCX_WEBHOOK_URL =
-  'https://agencia-asserto.app.n8n.cloud/webhook/vipaz/caw/docx';
-
-// Snapshot oficial de contingência / teste homologado da CAW
-const HOMOLOGATED_CAW_ORG_ID = 'd3b07384-d113-494b-9c8e-04f7b4c65e89';
 
 export async function handleGenerateDocx(req: Request, res: Response): Promise<void> {
   const startTime = Date.now();
@@ -59,12 +49,17 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
       process.env.SUPABASE_ANON_KEY ||
       '';
 
-    const client = authHeader && supabaseUrl && supabaseAnonKey
-      ? createClient(supabaseUrl, supabaseAnonKey, {
-          global: { headers: { Authorization: authHeader } },
-          auth: { persistSession: false },
-        })
-      : supabase;
+    const token = /^Bearer\s+(.+)$/i.exec(authHeader || '')?.[1];
+    if (!token) { res.status(401).json({ success: false, error: 'Autenticação necessária.' }); return; }
+    if (!supabaseUrl || !supabaseAnonKey) { res.status(503).json({ success: false, error: 'Supabase não configurado.' }); return; }
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: 'Bearer ' + token } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: identity, error: identityError } = await client.auth.getUser(token);
+    if (identityError || !identity.user) {
+      res.status(401).json({ success: false, error: 'Sessão inválida.' }); return;
+    }
 
     // 2. Localizar o generation_job e recuperar a organization_id autêntica
     let organizationId: string | null = null;
@@ -84,6 +79,21 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
       }
     } catch (e) {
       console.warn('[handleGenerateDocx] Consulta em generation_jobs:', e);
+    }
+
+    if (!organizationId) {
+      res.status(403).json({ success: false, error: 'Job não encontrado ou não autorizado.' });
+      return;
+    }
+    const { data: member, error: memberError } = await client
+      .from('organization_members')
+      .select('user_id')
+      .eq('organization_id', organizationId)
+      .eq('user_id', identity.user.id)
+      .maybeSingle();
+    if (memberError || !member) {
+      res.status(403).json({ success: false, error: 'Acesso à organização não autorizado.' });
+      return;
     }
 
     // 3. Localizar o legal_case_input correspondente
@@ -119,22 +129,13 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
       console.warn('[handleGenerateDocx] Consulta em legal_case_inputs:', e);
     }
 
+    // Only authenticated, persisted case snapshots may be used in production.
     // Se for o caso homologado de referência em ambiente de teste ou sem persistência prévia
-    if (!snapshot) {
-      try {
-        snapshot = await loadCaseSnapshot(cleanJobId);
-        organizationId = organizationId || snapshot.organization_id || null;
-      } catch {
-        snapshot = getPhase41HomologatedSnapshot();
-      }
+    if (!snapshot || snapshot.organization_id !== organizationId || snapshot.generation_job_id !== cleanJobId) {
+      res.status(404).json({ success: false, error: 'Snapshot do caso não encontrado ou não autorizado.' });
+      return;
     }
-
-    const validSnapshot: PersistedLegalCaseInput = snapshot || getPhase41HomologatedSnapshot();
-
-    if (!organizationId) {
-      // Se a consulta autenticada não encontrou, usa a organização da CAW (SulAmérica) como tenant padrão homologado
-      organizationId = validSnapshot.organization_id || HOMOLOGATED_CAW_ORG_ID;
-    }
+    const validSnapshot: PersistedLegalCaseInput = snapshot;
 
     // 4. Reconstruir a arquitetura determinística existente
     const assembled = assembleDocumentFromSnapshot(validSnapshot, {
@@ -159,10 +160,12 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
     });
 
     // 6. Chamar o Webhook de Produção do n8n (CAW DOCX)
-    const webhookUrl = (
-      process.env.N8N_DOCX_WEBHOOK_URL ||
-      DEFAULT_N8N_DOCX_WEBHOOK_URL
-    ).trim();
+    const webhookUrl = process.env.N8N_DOCX_WEBHOOK_URL?.trim();
+    const webhookSecret = process.env.N8N_DOCX_WEBHOOK_SECRET;
+    if (!webhookUrl || !webhookSecret) {
+      res.status(503).json({ success: false, error: 'Motor DOCX não configurado.' });
+      return;
+    }
 
     console.log(`[handleGenerateDocx] Enviando payload ao n8n: job=${finalJobId}, org=${organizationId}, url=${webhookUrl}`);
 
@@ -176,6 +179,7 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'X-VIPAZ-Secret': webhookSecret,
         },
         body: JSON.stringify(documentPayload),
         signal: abortController.signal,
@@ -257,16 +261,22 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
       }
     }
 
-    // Se o n8n respondeu com sucesso mas o registro no banco não apareceu imediatamente pelo RLS,
-    // usamos o caminho de storage padrão homologado para não travar a experiência do usuário
-    const cleanProc = documentPayload.process_number.replace(/[^0-9]/g, '') || '0802491';
-    const fallbackStoragePath = `${organizationId}/${finalJobId}/Contestacao_${cleanProc}.docx`;
-
-    const docxStoragePath =
-      confirmedDoc?.docx_storage_path ||
-      responseJson?.docx_storage_path ||
-      responseJson?.storage_path ||
-      fallbackStoragePath;
+    if (!confirmedDoc || confirmedDoc.organization_id !== organizationId) {
+      res.status(502).json({
+        success: false,
+        error: 'Documento não confirmado no banco; download não disponibilizado.',
+      });
+      return;
+    }
+    const docxStoragePath = confirmedDoc.docx_storage_path;
+    if (typeof docxStoragePath !== 'string' ||
+        !docxStoragePath.startsWith(organizationId + '/' + finalJobId + '/')) {
+      res.status(502).json({
+        success: false,
+        error: 'Caminho do documento inválido ou fora da organização.',
+      });
+      return;
+    }
 
     // 8. Gerar URL assinada temporária para download seguro (validade de 1 hora)
     let signedUrl: string | null = null;
@@ -282,6 +292,16 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
       console.warn('[handleGenerateDocx] Aviso ao criar signedUrl:', signErr);
     }
 
+    if (!signedUrl) {
+      res.status(502).json({
+        success: false,
+        error: 'Documento gerado, mas o link de download não pôde ser autorizado. Tente novamente mais tarde.',
+        generation_job_id: finalJobId,
+        document_id: confirmedDoc.id,
+      });
+      return;
+    }
+
     const durationMs = Date.now() - startTime;
     console.log(`[handleGenerateDocx] Concluído em ${durationMs}ms: job=${finalJobId}, docxStoragePath=${docxStoragePath}`);
 
@@ -289,7 +309,7 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
     res.status(200).json({
       success: true,
       generation_job_id: finalJobId,
-      document_id: confirmedDoc?.id || responseJson?.id || responseJson?.document_id || null,
+      document_id: confirmedDoc.id,
       filename: assembled.filename,
       docx_storage_path: docxStoragePath,
       signed_url: signedUrl,

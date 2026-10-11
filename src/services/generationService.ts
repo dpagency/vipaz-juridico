@@ -132,9 +132,6 @@ export function sanitizeFilename(originalName: string): string {
   return `${finalBase}.pdf`;
 }
 
-const DEFAULT_N8N_GENERATION_WEBHOOK_URL =
-  'https://agencia-asserto.app.n8n.cloud/webhook/vipaz/caw/generation';
-
 export class GenerationService {
   /**
    * Criação real de processo, matérias, job, etapas, upload no Storage e documento fonte.
@@ -320,9 +317,10 @@ export class GenerationService {
       // PASSO 9 — Disparo do Webhook de Produção do n8n
       params.onProgressState?.('Acionando motor forense n8n...');
 
-      const webhookUrl =
-        (import.meta.env.VITE_N8N_GENERATION_WEBHOOK_URL as string | undefined)?.trim() ||
-        DEFAULT_N8N_GENERATION_WEBHOOK_URL;
+      const webhookUrl = '/api/start-generation';
+      const { data: currentSession } = await supabase.auth.getSession();
+      const accessToken = currentSession.session?.access_token;
+      if (!accessToken) throw new Error('Sessão expirada antes do acionamento do motor.');
 
       let webhookResponse: Response;
       try {
@@ -330,6 +328,7 @@ export class GenerationService {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + accessToken,
           },
           body: JSON.stringify({
             generation_job_id,

@@ -1,0 +1,31 @@
+name: VIPAZ Studio DOCX smoke test
+on:
+  push:
+    branches:
+      - security/backend-generation-webhook
+  workflow_dispatch:
+jobs:
+  studio-docx:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Build frontend and server
+        run: npm run build
+      - name: Generate fictional DOCX without external services
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: test-public-key-not-a-secret
+        run: npm run test:studio
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: vipaz-studio-contestacao-docx
+          path: artifacts/vipaz-studio-contestacao-ficticia.docx
+          if-no-files-found: error
+      - run: npm run lint

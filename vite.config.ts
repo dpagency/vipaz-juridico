@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, Plugin } from 'vite';
 
 function apiProxyPlugin(): Plugin {
@@ -57,7 +58,7 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss(), apiProxyPlugin()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.dirname(fileURLToPath(import.meta.url)),
       },
     },
     server: {
