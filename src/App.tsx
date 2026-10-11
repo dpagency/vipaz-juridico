@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { authService, AuthSession } from './services/authService';
 import { LandingPage } from './views/LandingPage';
 import { LoginPage } from './views/LoginPage';
+import { ResetPasswordPage } from './views/ResetPasswordPage';
 import { AppShell } from './components/AppShell';
 import { DashboardView } from './views/DashboardView';
 import { NovaPecaView } from './views/NovaPecaView';
@@ -82,6 +83,10 @@ function AppContent() {
         </div>
       </div>
     );
+  }
+
+  if (currentPath === '/redefinir-senha') {
+    return <ResetPasswordPage onNavigateLogin={() => navigate('/login')} />;
   }
 
   // User Authenticated in Supabase but without active organization
