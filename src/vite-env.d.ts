@@ -8,3 +8,9 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** TypeScript 7 side-effect stylesheet imports (Vite transforms CSS during bundling). */
+declare module '*.css' {
+  const stylesheet: string;
+  export default stylesheet;
+}
