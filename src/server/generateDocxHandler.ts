@@ -292,6 +292,16 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
       console.warn('[handleGenerateDocx] Aviso ao criar signedUrl:', signErr);
     }
 
+    if (!signedUrl) {
+      res.status(502).json({
+        success: false,
+        error: 'Documento gerado, mas o link de download não pôde ser autorizado. Tente novamente mais tarde.',
+        generation_job_id: finalJobId,
+        document_id: confirmedDoc.id,
+      });
+      return;
+    }
+
     const durationMs = Date.now() - startTime;
     console.log(`[handleGenerateDocx] Concluído em ${durationMs}ms: job=${finalJobId}, docxStoragePath=${docxStoragePath}`);
 
@@ -299,7 +309,7 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
     res.status(200).json({
       success: true,
       generation_job_id: finalJobId,
-      document_id: confirmedDoc?.id || responseJson?.id || responseJson?.document_id || null,
+      document_id: confirmedDoc.id,
       filename: assembled.filename,
       docx_storage_path: docxStoragePath,
       signed_url: signedUrl,
