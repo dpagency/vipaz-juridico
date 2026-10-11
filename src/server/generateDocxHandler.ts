@@ -261,16 +261,22 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
       }
     }
 
-    // Se o n8n respondeu com sucesso mas o registro no banco não apareceu imediatamente pelo RLS,
-    // usamos o caminho de storage padrão homologado para não travar a experiência do usuário
-    const cleanProc = documentPayload.process_number.replace(/[^0-9]/g, '') || '0802491';
-    const fallbackStoragePath = `${organizationId}/${finalJobId}/Contestacao_${cleanProc}.docx`;
-
-    const docxStoragePath =
-      confirmedDoc?.docx_storage_path ||
-      responseJson?.docx_storage_path ||
-      responseJson?.storage_path ||
-      fallbackStoragePath;
+    if (!confirmedDoc || confirmedDoc.organization_id !== organizationId) {
+      res.status(502).json({
+        success: false,
+        error: 'Documento não confirmado no banco; download não disponibilizado.',
+      });
+      return;
+    }
+    const docxStoragePath = confirmedDoc.docx_storage_path;
+    if (typeof docxStoragePath !== 'string' ||
+        !docxStoragePath.startsWith(organizationId + '/' + finalJobId + '/')) {
+      res.status(502).json({
+        success: false,
+        error: 'Caminho do documento inválido ou fora da organização.',
+      });
+      return;
+    }
 
     // 8. Gerar URL assinada temporária para download seguro (validade de 1 hora)
     let signedUrl: string | null = null;
