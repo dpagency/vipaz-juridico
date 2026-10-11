@@ -1,0 +1,20 @@
+name: VIPAZ Studio DOCX smoke test
+on:
+  push:
+    branches:
+      - security/backend-generation-webhook
+  workflow_dispatch:
+jobs:
+  studio-docx:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:studio
+      - run: npm run lint
