@@ -17,10 +17,6 @@ import { Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import {
   assembleDocumentFromSnapshot,
-  getPhase41HomologatedSnapshot,
-  loadCaseSnapshot,
-  OFFICIAL_HOMOLOGATED_JOB_ID,
-  OFFICIAL_HOMOLOGATED_INPUT_ID,
 } from '../services/experimentalDocxService.js';
 import { buildCawDocxPayload } from '../domain/legal-engine/documentPayloadMapper.js';
 import { PersistedLegalCaseInput } from '../domain/legal-engine/caseDataMapper.js';
@@ -85,6 +81,21 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
       console.warn('[handleGenerateDocx] Consulta em generation_jobs:', e);
     }
 
+    if (!organizationId) {
+      res.status(403).json({ success: false, error: 'Job não encontrado ou não autorizado.' });
+      return;
+    }
+    const { data: member, error: memberError } = await client
+      .from('organization_members')
+      .select('user_id')
+      .eq('organization_id', organizationId)
+      .eq('user_id', identity.user.id)
+      .maybeSingle();
+    if (memberError || !member) {
+      res.status(403).json({ success: false, error: 'Acesso à organização não autorizado.' });
+      return;
+    }
+
     // 3. Localizar o legal_case_input correspondente
     // Busca por generation_job_id ou pelo id do próprio legal_case_input
     try {
@@ -120,7 +131,7 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
 
     // Only authenticated, persisted case snapshots may be used in production.
     // Se for o caso homologado de referência em ambiente de teste ou sem persistência prévia
-    if (!snapshot || !organizationId || snapshot.organization_id !== organizationId) {
+    if (!snapshot || snapshot.organization_id !== organizationId || snapshot.generation_job_id !== cleanJobId) {
       res.status(404).json({ success: false, error: 'Snapshot do caso não encontrado ou não autorizado.' });
       return;
     }
