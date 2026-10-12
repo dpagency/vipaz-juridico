@@ -20,13 +20,44 @@ function textOf(paragraph: string): string {
   return [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map(match => decodeXml(match[1])).join('');
 }
 function replaceText(paragraph: string, text: string): string {
-  const runs = [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g)];
+  const runs = [...paragraph.matchAll(/<w:t(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:t>/g)];
   if (!runs.length) return paragraph;
   let index = 0;
-  return paragraph.replace(/<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g, () => {
+  return paragraph.replace(/<w:t(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:t>/g, () => {
     const output = index++ === 0 ? xmlEscape(text) : '';
     return '<w:t xml:space="preserve">' + output + '</w:t>';
   });
+}
+// Replace only the text nodes intersecting each placeholder. Other runs and their
+// typography remain untouched; replacement inherits the first marker run style.
+function replaceMarkersPreservingRuns(paragraph: string, data: StudioData, warnings: string[]): string {
+  const textNodes = [...paragraph.matchAll(/<w:t(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:t>/g)];
+  if (!textNodes.length) return paragraph;
+  const texts = textNodes.map(node => decodeXml(node[0].replace(/^<w:t(?:\\s[^>]*)?>|<\\/w:t>$/g, '')));
+  const joined = texts.join('');
+  const matches = [...joined.matchAll(markerRegex)];
+  if (!matches.length) return paragraph;
+  const offsets: number[] = [];
+  let cursor = 0;
+  for (const text of texts) { offsets.push(cursor); cursor += text.length; }
+  for (const match of matches.reverse()) {
+    const start = match.index!, end = start + match[0].length;
+    const expression = match[1], value = resolve(data, pathOf(expression));
+    if (value === undefined || value === null) warnings.push('Campo ausente: ' + pathOf(expression));
+    const replacement = apply(value, expression);
+    const first = offsets.findLastIndex(offset => offset <= start);
+    const last = offsets.findLastIndex(offset => offset < end);
+    if (first < 0 || last < 0) continue;
+    const firstLocal = start - offsets[first], lastLocal = end - offsets[last];
+    if (first === last) texts[first] = texts[first].slice(0, firstLocal) + replacement + texts[first].slice(lastLocal);
+    else {
+      texts[first] = texts[first].slice(0, firstLocal) + replacement;
+      for (let i = first + 1; i < last; i++) texts[i] = '';
+      texts[last] = texts[last].slice(lastLocal);
+    }
+  }
+  let index = 0;
+  return paragraph.replace(/<w:t(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:t>/g, () => '<w:t xml:space="preserve">' + xmlEscape(texts[index++]) + '</w:t>');
 }
 export function inspectStudioXml(xml: string): StudioMarker[] {
   const counts = new Map<string, StudioMarker>();
@@ -115,31 +146,7 @@ export async function renderStudioDocx(file: Blob, data: StudioData): Promise<Bl
       unsupported.map(marker => '{d.' + marker.expression + '}').join(', '));
   }
   const warnings: string[] = [];
-  const output = xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, paragraph => {
-    const text = textOf(paragraph);
-    const markers = [...text.matchAll(markerRegex)];
-    if (!markers.length) return paragraph;
-    const conditional = markers.find(m => m[1].includes(':ifEQ(false):drop(p)'));
-    if (conditional && resolve(data, pathOf(conditional[1])) === false) return '';
-    const repeat = markers.find(m => /\[i(?:\+1)?\]/.test(m[1]));
-    if (repeat) {
-      const value = resolve(data, pathOf(repeat[1]));
-      if (!Array.isArray(value)) { warnings.push('Lista ausente: ' + pathOf(repeat[1])); return ''; }
-      // A list is rendered as complete paragraphs; no fragile [i]/[i+1] pairing.
-      // Legacy templates may contain adjacent [i] and [i+1] paragraphs.
-      if (repeat[1].includes('[i+1]')) return '';
-      return value.map(item => replaceText(paragraph, text.replace(markerRegex, (_full, expr: string) =>
-        /\[i(?:\+1)?\]/.test(expr) ? apply(item, expr) : apply(resolve(data, pathOf(expr)), expr)
-      ))).join('');
-    }
-    const rendered = text.replace(markerRegex, (_full, expr: string) => {
-      if (expr.includes(':ifEQ(false):drop(p)')) return '';
-      const value = resolve(data, pathOf(expr));
-      if (value === undefined) warnings.push('Campo ausente: ' + pathOf(expr));
-      return apply(value, expr);
-    });
-    return replaceText(paragraph, rendered);
-  });
+  const output = xml.replace(/<w:p(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:p>/g, paragraph => replaceMarkersPreservingRuns(paragraph, data, warnings));
   if (warnings.length) throw new Error([...new Set(warnings)].join('\n'));
   zip.file('word/document.xml', output);
   const bytes = await zip.generateAsync({ type: 'uint8array' });
