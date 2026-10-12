@@ -146,7 +146,7 @@ export async function renderStudioDocx(file: Blob, data: StudioData): Promise<Bl
       unsupported.map(marker => '{d.' + marker.expression + '}').join(', '));
   }
   const warnings: string[] = [];
-  const output = xml.replace(/<w:p(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:p>/g, paragraph => replaceMarkersPreservingRuns(paragraph, data, warnings));
+  const output = xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, paragraph => replaceMarkersPreservingRuns(paragraph, data, warnings));
   if (warnings.length) throw new Error([...new Set(warnings)].join('\n'));
   zip.file('word/document.xml', output);
   const bytes = await zip.generateAsync({ type: 'uint8array' });
