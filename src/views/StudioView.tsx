@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { inspectStudioStructure, renderStudioDocx, type StudioParagraph, type StudioMarker } from '../services/studioTemplateEngine';
+import { inspectStudioStructure, renderStudioDocx, setStudioDataPath, validateStudioData, type StudioParagraph, type StudioMarker } from '../services/studioTemplateEngine';
 
 const exampleData = {
   processo: { numero: '0000000-00.2026.8.00.0000' },
@@ -33,6 +33,14 @@ export function StudioView() {
     } finally { setBusy(false); }
   }
 
+  const parsedData = (() => { try { const value: unknown = JSON.parse(json); return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null; } catch { return null; } })();
+  const validation = parsedData ? validateStudioData(markers, parsedData) : null;
+  const selected = markers.find(marker => marker.expression === selectedMarker);
+  function updateSelectedValue(value: string) {
+    if (!selected || !parsedData || selected.kind !== 'field') return;
+    try { setJson(JSON.stringify(setStudioDataPath(parsedData, selected.path, value), null, 2)); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Campo inválido'); }
+  }
   async function exportDocument() {
     if (!file) return;
     setBusy(true); setStatus('');
@@ -66,7 +74,9 @@ export function StudioView() {
       <code className="block text-xs break-all">{'{d.' + selectedMarker + '}'}</code>
       <label className="block text-xs">Descrição funcional / regra de preenchimento (rascunho local)</label>
       <textarea aria-label="Descrição do placeholder" className="w-full rounded-lg border bg-transparent p-2 text-sm" rows={2} value={fieldNotes[selectedMarker] || ''} onChange={event => setFieldNotes(previous => ({ ...previous, [selectedMarker]: event.target.value }))} />
-      <p className="text-xs opacity-60">Anotações não persistidas; regras automáticas e edição de posições serão implementadas na próxima etapa.</p>
+      {selected?.kind === 'field' && <label className="block text-xs">Valor fictício vinculado ao campo<input aria-label="Valor do placeholder" className="mt-1 block w-full rounded-lg border bg-transparent p-2 text-sm" value={selected.path.split('.').reduce<unknown>((value, key) => value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined, parsedData || {}) as string || ''} onChange={event => updateSelectedValue(event.target.value)} /></label>}
+      {selected?.kind !== 'field' && <p className="text-sm text-amber-600">Condição ou repetição Carbone: requer migração e homologação; geração bloqueada.</p>}
+      <p className="text-xs opacity-60">Anotações não persistidas; a edição modifica apenas os dados fictícios, não as posições do modelo.</p>
     </section>}
     <div className="grid md:grid-cols-2 gap-5">
       <section className="rounded-xl border p-5 space-y-3">
@@ -83,6 +93,14 @@ export function StudioView() {
         <textarea id="studio-data" className="w-full h-96 rounded-lg border bg-transparent p-3 font-mono text-xs" value={json} onChange={event => setJson(event.target.value)} spellCheck={false} />
       </section>
     </div>
+    {file && <section className="rounded-xl border p-5 space-y-2">
+      <h2 className="font-semibold">Validação prévia do modelo</h2>
+      {!parsedData && <p role="alert" className="text-red-600 text-sm">JSON inválido: corrija os dados antes de gerar.</p>}
+      {validation && <p className="text-sm">{validation.available.length} campos preenchidos · {validation.missing.length} ausentes · {validation.unsupported.length} expressões não homologadas</p>}
+      {validation?.missing.map(path => <p key={path} className="text-xs text-red-600">Campo obrigatório sem valor: {path}</p>)}
+      {validation?.unsupported.map(path => <p key={path} className="text-xs text-amber-600">Expressão não homologada: {path}</p>)}
+      <p className="text-xs opacity-60">Teses e pedidos identificados nos parágrafos exigem revisão humana; nenhuma tese é ativada automaticamente.</p>
+    </section>}
     {file && <section className="rounded-xl border p-5 space-y-3">
       <h2 className="font-semibold">4. Estrutura do documento (visualização textual)</h2>
       <p className="text-xs opacity-60">Parágrafos e estilos extraídos do DOCX; esta visualização não reproduz a paginação do Word.</p>
@@ -92,7 +110,7 @@ export function StudioView() {
           <span className="whitespace-pre-wrap break-words">{p.text}</span>
         </div>)}</div>
     </section>}
-    <button type="button" disabled={!file || busy} onClick={() => void exportDocument()} className="rounded-lg bg-cyan-700 text-white px-5 py-3 font-semibold disabled:opacity-50">
+    <button type="button" disabled={!file || busy || !validation || validation.missing.length > 0 || validation.unsupported.length > 0} onClick={() => void exportDocument()} className="rounded-lg bg-cyan-700 text-white px-5 py-3 font-semibold disabled:opacity-50">
       {busy ? 'Processando…' : '5. Gerar e baixar DOCX'}
     </button>
     {status && <p role="status" className="rounded-lg border p-3 text-sm whitespace-pre-wrap">{status}</p>}
