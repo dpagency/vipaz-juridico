@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, FolderKanban, BookOpen, BarChart3, Settings2, Plus, LogOut, Scale, PanelLeftClose, PanelLeft, X } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, BookOpen, BarChart3, Settings2, FileCode2, Plus, LogOut, Scale, PanelLeftClose, PanelLeft, X } from 'lucide-react';
 import { Organization, Profile } from '../types';
 
 interface SidebarProps {
@@ -18,6 +18,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ['Casos', `/app/${slug}/casos`, Scale, (p:string)=>p.includes('/casos')||p.includes('/caso/')],
     ['Documentos', `/app/${slug}/documentos`, FolderKanban, (p:string)=>p.includes('/documentos')],
     ['Biblioteca', `/app/${slug}/biblioteca`, BookOpen, (p:string)=>p.includes('/biblioteca')],
+    ['VIPAZ Studio', `/app/${slug}/studio`, FileCode2, (p:string)=>p.endsWith('/studio')],
     ['Indicadores', `/app/${slug}/indicadores`, BarChart3, (p:string)=>p.includes('/indicadores')],
   ] as const;
   const go=(path:string)=>{onNavigate(path);onCloseMobile();};
