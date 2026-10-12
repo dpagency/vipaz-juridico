@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { authService, AuthSession } from './services/authService';
 import { LandingPage } from './views/LandingPage';
 import { LoginPage } from './views/LoginPage';
+import { ResetPasswordPage } from './views/ResetPasswordPage';
 import { AppShell } from './components/AppShell';
 import { DashboardView } from './views/DashboardView';
 import { NovaPecaView } from './views/NovaPecaView';
@@ -16,12 +17,17 @@ import { StudioView } from './views/StudioView';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ShieldAlert, LogOut, ArrowRight, Loader2 } from 'lucide-react';
 
+const isVipazDomain = ['vipaz.com.br', 'www.vipaz.com.br'].includes(window.location.hostname);
+const appPrefix = isVipazDomain ? '/juridico' : '';
+const toPublicPath = (path: string) => appPrefix && path.startsWith('/') ? appPrefix + path : path;
+const toInternalPath = (path: string) => appPrefix && (path === appPrefix || path.startsWith(appPrefix + '/')) ? (path.slice(appPrefix.length) || '/') : path;
+
 function AppContent() {
   const [session, setSession] = useState<AuthSession | null>(authService.getSession());
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(authService.isInitialLoading());
   const [userWithoutOrg, setUserWithoutOrg] = useState<boolean>(authService.isUserWithoutOrg());
   const [currentPath, setCurrentPath] = useState<string>(() => {
-    return window.location.pathname || '/';
+    return toInternalPath(window.location.pathname || '/');
   });
 
   // Listen for auth state changes from Supabase
@@ -37,7 +43,7 @@ function AppContent() {
   // Listen for browser popstate (back/forward)
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentPath(window.location.pathname || '/');
+      setCurrentPath(toInternalPath(window.location.pathname || '/'));
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -46,7 +52,7 @@ function AppContent() {
   // Navigate helper with history pushState
   const navigate = (path: string) => {
     if (path !== currentPath) {
-      window.history.pushState({}, '', path);
+      window.history.pushState({}, '', toPublicPath(path));
       setCurrentPath(path);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -66,6 +72,15 @@ function AppContent() {
     }
   };
 
+  // The institutional homepage is independent from the authenticated legal workspace.
+  if (isVipazDomain && (window.location.pathname === '/' || window.location.pathname === '/index.html')) {
+    return <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-8 text-center">
+      <h1 className="text-5xl font-bold tracking-tight">VIPAZ</h1>
+      <p className="mt-5 max-w-lg text-slate-300">Tecnologia e soluções para transformar o trabalho profissional.</p>
+      <a className="mt-8 rounded-lg bg-cyan-600 px-6 py-3 font-semibold hover:bg-cyan-500" href="/juridico">Acessar VIPAZ Jurídico</a>
+    </main>;
+  }
+
   // Initial Auth Loading Screen
   if (isLoadingAuth) {
     return (
@@ -82,6 +97,10 @@ function AppContent() {
         </div>
       </div>
     );
+  }
+
+  if (currentPath === '/redefinir-senha') {
+    return <ResetPasswordPage onNavigateLogin={() => navigate('/login')} />;
   }
 
   // User Authenticated in Supabase but without active organization
@@ -125,7 +144,7 @@ function AppContent() {
   if (currentPath === '/login') {
     if (session) {
       const target = `/app/${session.organization.slug}`;
-      window.history.replaceState({}, '', target);
+      window.history.replaceState({}, '', toPublicPath(target));
       return (
         <AppShell
           currentPath={target}
@@ -153,7 +172,7 @@ function AppContent() {
   // Authenticated Area Protection: /app/*
   if (currentPath.startsWith('/app')) {
     if (!session) {
-      window.history.replaceState({}, '', '/login');
+      window.history.replaceState({}, '', toPublicPath('/login'));
       return (
         <LoginPage
           onLoginSuccess={(tenantSlug) => {
@@ -169,7 +188,7 @@ function AppContent() {
     // Normalizes /app or /app/ without tenant to the user's active tenant
     if (currentPath === '/app' || currentPath === '/app/') {
       const target = `/app/${currentOrg.slug}`;
-      window.history.replaceState({}, '', target);
+      window.history.replaceState({}, '', toPublicPath(target));
       return (
         <AppShell
           currentPath={target}
