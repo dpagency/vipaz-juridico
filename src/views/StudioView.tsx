@@ -15,6 +15,7 @@ export function StudioView() {
   const [tableCount, setTableCount] = useState(0);
   const [filter, setFilter] = useState('');
   const [selectedMarker, setSelectedMarker] = useState('');
+  const [fieldNotes, setFieldNotes] = useState<Record<string, string>>({});
   const [json, setJson] = useState(JSON.stringify(exampleData, null, 2));
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
@@ -60,6 +61,13 @@ export function StudioView() {
       {file && <p className="text-sm">{file.name} — {markers.length} expressões · {paragraphs.length} parágrafos · {tableCount} tabelas</p>}
       <p className="text-xs opacity-60">Arquivo processado localmente no navegador. Use apenas modelos sem dados pessoais reais durante a homologação.</p>
     </section>
+    {selectedMarker && <section className="rounded-xl border border-cyan-500/40 p-4 space-y-2">
+      <h2 className="font-semibold">Configuração do campo selecionado</h2>
+      <code className="block text-xs break-all">{'{d.' + selectedMarker + '}'}</code>
+      <label className="block text-xs">Descrição funcional / regra de preenchimento (rascunho local)</label>
+      <textarea aria-label="Descrição do placeholder" className="w-full rounded-lg border bg-transparent p-2 text-sm" rows={2} value={fieldNotes[selectedMarker] || ''} onChange={event => setFieldNotes(previous => ({ ...previous, [selectedMarker]: event.target.value }))} />
+      <p className="text-xs opacity-60">Anotações não persistidas; regras automáticas e edição de posições serão implementadas na próxima etapa.</p>
+    </section>}
     <div className="grid md:grid-cols-2 gap-5">
       <section className="rounded-xl border p-5 space-y-3">
         <h2 className="font-semibold">2. Placeholders encontrados</h2>
