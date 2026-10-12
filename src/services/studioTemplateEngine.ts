@@ -62,6 +62,31 @@ export async function inspectStudioDocx(file: Blob): Promise<StudioMarker[]> {
   if (!xml) throw new Error('O arquivo não contém word/document.xml');
   return inspectStudioXml(xml);
 }
+export interface StudioValidation { missing: string[]; unsupported: string[]; available: string[]; }
+export function validateStudioData(markers: StudioMarker[], data: StudioData): StudioValidation {
+  const missing: string[] = [], unsupported: string[] = [], available: string[] = [];
+  for (const marker of markers) {
+    if (marker.kind !== 'field') { unsupported.push(marker.expression); continue; }
+    const value = resolve(data, marker.path);
+    if (value === undefined || value === null || (typeof value === 'string' && !value.trim())) missing.push(marker.path);
+    else if (typeof value === 'object') unsupported.push(marker.expression);
+    else available.push(marker.path);
+  }
+  return { missing: [...new Set(missing)], unsupported: [...new Set(unsupported)], available: [...new Set(available)] };
+}
+export function setStudioDataPath(data: StudioData, path: string, value: string): StudioData {
+  if (!/^[a-zA-Z_][\\w]*(?:\\.[a-zA-Z_][\\w]*)*$/.test(path) || path.split('.').some(k => ['__proto__', 'prototype', 'constructor'].includes(k))) throw new Error('Caminho de variável inválido');
+  const copy: StudioData = JSON.parse(JSON.stringify(data));
+  const keys = path.split('.');
+  let cursor: StudioData = copy;
+  for (const key of keys.slice(0, -1)) {
+    if (!cursor[key] || typeof cursor[key] !== 'object' || Array.isArray(cursor[key])) cursor[key] = {};
+    cursor = cursor[key] as StudioData;
+  }
+  cursor[keys[keys.length - 1]] = value;
+  return copy;
+}
+
 export async function renderStudioDocx(file: Blob, data: StudioData): Promise<Blob> {
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const entry = zip.file('word/document.xml');
