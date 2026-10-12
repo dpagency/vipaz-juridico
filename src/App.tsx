@@ -323,7 +323,7 @@ function AppContent() {
     }
 
     // VIPAZ Monitor: module entry point; publication ingestion remains a future integration.
-    const monitorMatch = currentPath.match(/^\\/app\\/([a-zA-Z0-9_-]+)\\/monitor$/);
+    const monitorMatch = currentPath.match(/^\/app\/([a-zA-Z0-9_-]+)\/monitor$/);
     if (monitorMatch) {
       return (
         <AppShell currentPath={currentPath} onNavigate={navigate} organization={currentOrg}
