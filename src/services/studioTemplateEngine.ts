@@ -45,8 +45,8 @@ function replaceMarkersPreservingRuns(paragraph: string, data: StudioData, warni
     const expression = match[1], value = resolve(data, pathOf(expression));
     if (value === undefined || value === null) warnings.push('Campo ausente: ' + pathOf(expression));
     const replacement = apply(value, expression);
-    const first = offsets.findLastIndex(offset => offset <= start);
-    const last = offsets.findLastIndex(offset => offset < end);
+    const first = offsets.reduce((found, offset, i) => offset <= start ? i : found, -1);
+    const last = offsets.reduce((found, offset, i) => offset < end ? i : found, -1);
     if (first < 0 || last < 0) continue;
     const firstLocal = start - offsets[first], lastLocal = end - offsets[last];
     if (first === last) texts[first] = texts[first].slice(0, firstLocal) + replacement + texts[first].slice(lastLocal);
