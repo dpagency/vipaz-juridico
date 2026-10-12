@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { DocumentRenderer } from '../../../services/documentRenderer.js';
 import { getPhase41HomologatedSnapshot, assembleDocumentFromSnapshot } from '../../../services/experimentalDocxService.js';
+import { inspectStudioStructure, validateStudioData, setStudioDataPath, renderStudioDocx } from '../../../services/studioTemplateEngine.js';
 import { resolveVipazStudioTheme } from '../../../services/vipazStudioTheme.js';
 
 async function run() {
@@ -37,6 +38,26 @@ async function run() {
   // 5. Identificação processual e tese central devem estar no documento.
   assert.ok(documentXml.includes('0802491'), 'Número de processo fictício ausente');
   assert.ok(documentXml.includes('SUL AMÉRICA') || documentXml.includes('SUL AM'), 'Identificação da parte do modelo PME ausente');
+  // Gate de importação: modelo fictício com marcador repartido entre runs.
+  const fixture = new JSZip();
+  const originalXml = '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>{d.processo.</w:t></w:r><w:r><w:t>numero}</w:t></w:r></w:p><w:p><w:r><w:t>Texto jurídico inalterado</w:t></w:r></w:p></w:body></w:document>';
+  fixture.file('word/document.xml', originalXml);
+  const fixtureBlob = new Blob([await fixture.generateAsync({ type: 'uint8array' })]);
+  const inspection = await inspectStudioStructure(fixtureBlob);
+  assert.equal(inspection.markers.length, 1, 'Placeholder dividido entre runs não identificado');
+  assert.equal(inspection.markers[0].path, 'processo.numero');
+  assert.equal(inspection.paragraphs.length, 2);
+  assert.deepEqual(validateStudioData(inspection.markers, {}).missing, ['processo.numero']);
+  const mapped = setStudioDataPath({}, 'processo.numero', '0000000-00.2026.8.00.0000');
+  assert.equal((mapped.processo as Record<string, unknown>).numero, '0000000-00.2026.8.00.0000');
+  assert.throws(() => setStudioDataPath({}, '__proto__.x', 'inseguro'));
+  const filled = await renderStudioDocx(fixtureBlob, mapped);
+  const filledXml = await (await JSZip.loadAsync(await filled.arrayBuffer())).file('word/document.xml')?.async('string');
+  assert.ok(filledXml?.includes('0000000-00.2026.8.00.0000'), 'Valor fictício não aplicado');
+  assert.ok(filledXml?.includes('<w:b/>'), 'Estilo original removido');
+  assert.ok(filledXml?.includes('Texto jurídico inalterado'), 'Conteúdo jurídico alterado');
+  assert.ok(!filledXml?.includes('{d.processo.'), 'Placeholder residual');
+  console.log('VIPAZ Studio: importação, mapeamento, segurança e substituição entre runs aprovados');
   console.log('VIPAZ Studio: cinco gates OOXML/tema/conteúdo aprovados');
   await mkdir('artifacts', { recursive: true });
   await writeFile('artifacts/vipaz-studio-contestacao-ficticia.docx', new Uint8Array(await docx.arrayBuffer()));
