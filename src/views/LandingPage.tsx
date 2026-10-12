@@ -38,6 +38,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         <div className="mx-auto h-[72px] max-w-[1320px] px-6 lg:px-10 flex items-center justify-between">
           <button onClick={()=>onNavigate('/')} className="flex items-baseline gap-2"><span className="font-editorial text-[22px] font-bold tracking-tight">VIPAZ</span><span className="text-[11px] text-cyan-300">Jurídico</span></button>
           <div className="flex items-center gap-3">
+            <a href="/" className="hidden sm:inline text-[12px] text-white/55 hover:text-cyan-300 transition mr-2">Plataforma VIPAZ</a>
             <button onClick={()=>onNavigate('/login')} className="px-3 py-2 text-[12px] text-white/60 hover:text-white transition">Entrar</button>
             <button onClick={()=>onNavigate('/login')} className="rounded-full bg-white px-4 py-2 text-[12px] font-semibold text-black hover:bg-cyan-100 transition">Acessar plataforma</button>
           </div>
