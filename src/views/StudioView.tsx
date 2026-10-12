@@ -19,6 +19,7 @@ export function StudioView() {
   const [json, setJson] = useState(JSON.stringify(exampleData, null, 2));
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(false);
 
   async function openTemplate(selected: File | undefined) {
     if (!selected) return;
@@ -93,6 +94,18 @@ export function StudioView() {
         <textarea id="studio-data" className="w-full h-96 rounded-lg border bg-transparent p-3 font-mono text-xs" value={json} onChange={event => setJson(event.target.value)} spellCheck={false} />
       </section>
     </div>
+    {file && <section className="rounded-xl border p-5 space-y-2">
+      <button type="button" onClick={() => setPreview(value => !value)} className="rounded-lg border px-4 py-2 text-sm">{preview ? 'Ocultar pré-visualização' : 'Pré-visualizar substituições'}</button>
+      {preview && <div className="max-h-72 overflow-auto space-y-2">{paragraphs.filter(p => p.text.trim()).map(p => {
+        const text = p.text.replace(/\\{d\\.([^{}]+)\\}/g, (_match, expression: string) => {
+          const path = expression.split(':')[0];
+          const value = path.split('.').reduce<unknown>((v, key) => v && typeof v === 'object' ? (v as Record<string, unknown>)[key] : undefined, parsedData || {});
+          return value === undefined ? '[CAMPO AUSENTE]' : typeof value === 'object' ? '[EXPRESSÃO NÃO HOMOLOGADA]' : String(value);
+        });
+        return <p key={p.index} className="text-sm whitespace-pre-wrap border-b pb-2">{text}</p>;
+      })}</div>}
+      <p className="text-xs opacity-60">Prévia textual, não representa a diagramação final; condições e repetições permanecem bloqueadas.</p>
+    </section>}
     {file && <section className="rounded-xl border p-5 space-y-2">
       <h2 className="font-semibold">Validação prévia do modelo</h2>
       {!parsedData && <p role="alert" className="text-red-600 text-sm">JSON inválido: corrija os dados antes de gerar.</p>}
