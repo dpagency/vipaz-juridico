@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { inspectStudioStructure, renderStudioDocx, setStudioDataPath, validateStudioData, type StudioParagraph, type StudioMarker } from '../services/studioTemplateEngine';
+import { groupStudioLegalSections, inspectStudioStructure, renderStudioDocx, setStudioDataPath, validateStudioData, type StudioParagraph, type StudioMarker } from '../services/studioTemplateEngine';
 
 const exampleData = {
   processo: { numero: '0000000-00.2026.8.00.0000' },
@@ -100,6 +100,12 @@ export function StudioView() {
       {validation?.missing.map(path => <p key={path} className="text-xs text-red-600">Campo obrigatório sem valor: {path}</p>)}
       {validation?.unsupported.map(path => <p key={path} className="text-xs text-amber-600">Expressão não homologada: {path}</p>)}
       <p className="text-xs opacity-60">Teses e pedidos identificados nos parágrafos exigem revisão humana; nenhuma tese é ativada automaticamente.</p>
+    </section>}
+    {file && <section className="rounded-xl border p-5 space-y-3">
+      <h2 className="font-semibold">Estrutura jurídica sugerida (revisão obrigatória)</h2>
+      <p className="text-xs opacity-60">Classificação heurística por títulos; não representa validação de teses nem pedidos.</p>
+      <div className="max-h-64 overflow-auto space-y-2">{groupStudioLegalSections(paragraphs).map(section =>
+        <div key={section.heading.index} className="rounded border p-2 text-sm"><span className="font-medium">{section.heading.text}</span><span className="ml-2 text-xs opacity-60">{section.category} · {section.paragraphs.length} parágrafos</span></div>)}</div>
     </section>}
     {file && <section className="rounded-xl border p-5 space-y-3">
       <h2 className="font-semibold">4. Estrutura do documento (visualização textual)</h2>
