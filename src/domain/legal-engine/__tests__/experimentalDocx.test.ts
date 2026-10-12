@@ -55,6 +55,19 @@ async function runSuite() {
 
   const baseSnapshot = getOfficialHomologatedSnapshot();
 
+  // Gate de homologação: o catálogo PME não pode ser confundido com modelo consumerista genérico.
+  await runTest('0. Arquitetura PME mantém escopo específico e qualificação fixa sinalizada', () => {
+    const arch = getOfficialHomologatedSnapshot();
+    assert(arch.architecture_id === 'arch_contestacao_pme_v1', 'Snapshot deve usar arquitetura PME específica');
+    const assembly = assembleDocumentFromSnapshot(arch);
+    const qualification = assembly.assembly.includedBlocks.find((block) => block.key === 'addressing_and_qualification');
+    assert(Boolean(qualification), 'Qualificação deve existir');
+    assert(qualification!.content.includes('SUL AMÉRICA COMPANHIA DE SEGURO SAÚDE'), 'Qualificação fixa deve ser detectável no teste');
+    assert(!assembly.assembly.includedBlocks.some((block) => block.key === 'generic_consumer_defense'), 'Não presumir arquitetura consumerista genérica');
+  });
+
+
+
   // Teste 1: Snapshot válido gera DOCX
   await runTest('1. Snapshot válido gera DOCX', async () => {
     const result = await experimentalDocxService.generateDocx(baseSnapshot);
