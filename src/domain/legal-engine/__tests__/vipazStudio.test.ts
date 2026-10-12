@@ -6,7 +6,7 @@ import { getPhase41HomologatedSnapshot, assembleDocumentFromSnapshot } from '../
 import { resolveVipazStudioTheme } from '../../../services/vipazStudioTheme.js';
 
 async function run() {
-  const theme = resolveVipazStudioTheme({ organizationName: 'Escritorio Ficticio', headerText: 'TESTE VIPAZ STUDIO', footerText: 'Documento ficticio', fontFamily: 'Times New Roman' });
+  const theme = resolveVipazStudioTheme({ organizationName: 'Escritorio Ficticio', headerText: 'TESTE VIPAZ STUDIO', footerText: 'Documento ficticio', fontFamily: 'Times New Roman', fontSizeHalfPoints: 26, textColor: '112233', mutedColor: '445566', marginTopTwips: 1550, marginBottomTwips: 1560, marginLeftTwips: 1800, marginRightTwips: 1400 });
   const result = assembleDocumentFromSnapshot(getPhase41HomologatedSnapshot());
   assert.ok(result.assembly.includedBlocks.length > 0);
   const docx = await new DocumentRenderer().renderToDocxBlob(result.assembly, theme);
@@ -31,6 +31,9 @@ async function run() {
   // 4. Fonte personalizada e configuração de margens devem estar no OOXML.
   assert.ok((documentXml + stylesXml).includes('Times New Roman'), 'Fonte do tema não aplicada');
   assert.ok(sectionXml.includes('<w:pgMar'), 'Margens da seção ausentes');
+  for (const margin of ['1550', '1560', '1800', '1400']) assert.ok(sectionXml.includes('="' + margin + '"'), 'Margem personalizada ausente: ' + margin);
+  assert.ok(documentXml.includes('112233'), 'Cor de texto personalizada ausente');
+  assert.ok((documentXml + stylesXml).includes('w:sz w:val="26"'), 'Tamanho de fonte personalizado ausente');
   // 5. Identificação processual e tese central devem estar no documento.
   assert.ok(documentXml.includes('0802491'), 'Número de processo fictício ausente');
   assert.ok(documentXml.includes('SUL AMÉRICA') || documentXml.includes('SUL AM'), 'Identificação da parte do modelo PME ausente');
