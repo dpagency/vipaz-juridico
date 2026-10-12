@@ -97,7 +97,7 @@ export function StudioView() {
     {file && <section className="rounded-xl border p-5 space-y-2">
       <button type="button" onClick={() => setPreview(value => !value)} className="rounded-lg border px-4 py-2 text-sm">{preview ? 'Ocultar pré-visualização' : 'Pré-visualizar substituições'}</button>
       {preview && <div className="max-h-72 overflow-auto space-y-2">{paragraphs.filter(p => p.text.trim()).map(p => {
-        const text = p.text.replace(/\\{d\\.([^{}]+)\\}/g, (_match, expression: string) => {
+        const text = p.text.replace(/\{d\.([^{}]+)\}/g, (_match, expression: string) => {
           const path = expression.split(':')[0];
           const value = path.split('.').reduce<unknown>((v, key) => v && typeof v === 'object' ? (v as Record<string, unknown>)[key] : undefined, parsedData || {});
           return value === undefined ? '[CAMPO AUSENTE]' : typeof value === 'object' ? '[EXPRESSÃO NÃO HOMOLOGADA]' : String(value);
