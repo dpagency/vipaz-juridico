@@ -87,6 +87,21 @@ export function setStudioDataPath(data: StudioData, path: string, value: string)
   return copy;
 }
 
+export interface StudioLegalSection { heading: StudioParagraph; paragraphs: StudioParagraph[]; category: 'tese' | 'pedido' | 'secao'; }
+export function groupStudioLegalSections(paragraphs: StudioParagraph[]): StudioLegalSection[] {
+  const sections: StudioLegalSection[] = [];
+  for (const paragraph of paragraphs) {
+    const text = paragraph.text.trim();
+    if (!text) continue;
+    const heading = /^(?:[IVXLC]+[.)\\-]|\\d+(?:\\.\\d+)*[.)\\-])\\s+/.test(text) || /heading|title|titulo|título/i.test(paragraph.style) || (/^[A-ZÀ-Ú\\s]{8,}$/.test(text) && text.length < 130);
+    if (heading) {
+      const category = /PEDIDOS|REQUERIMENTOS|REQUER/i.test(text) ? 'pedido' : /MÉRITO|PRELIMINAR|TESE|REAJUSTE|CONTRATO/i.test(text) ? 'tese' : 'secao';
+      sections.push({ heading: paragraph, paragraphs: [], category });
+    } else if (sections.length) sections[sections.length - 1].paragraphs.push(paragraph);
+  }
+  return sections;
+}
+
 export async function renderStudioDocx(file: Blob, data: StudioData): Promise<Blob> {
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const entry = zip.file('word/document.xml');
