@@ -48,12 +48,12 @@ export async function inspectStudioStructure(file: Blob): Promise<StudioInspecti
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const xml = await zip.file('word/document.xml')?.async('string');
   if (!xml) throw new Error('DOCX inválido: documento principal ausente');
-  const paragraphs: StudioParagraph[] = [...xml.matchAll(/<w:p(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:p>/g)].map((match, index) => {
+  const paragraphs: StudioParagraph[] = [...xml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g)].map((match, index) => {
     const text = textOf(match[0]);
-    const style = match[0].match(/<w:pStyle\\s+w:val="([^"]+)"/)?.[1] || 'Normal';
+    const style = match[0].match(/<w:pStyle\s+w:val="([^"]+)"/)?.[1] || 'Normal';
     return { index, text, style, markers: [...text.matchAll(markerRegex)].map(item => item[1]) };
   });
-  return { markers: inspectStudioXml(xml), paragraphs, tables: [...xml.matchAll(/<w:tbl(?:\\s[^>]*)?>/g)].length };
+  return { markers: inspectStudioXml(xml), paragraphs, tables: [...xml.matchAll(/<w:tbl(?:\s[^>]*)?>/g)].length };
 }
 
 export async function inspectStudioDocx(file: Blob): Promise<StudioMarker[]> {
