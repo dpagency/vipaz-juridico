@@ -29,14 +29,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
         // Creating an identity does NOT grant membership or create a tenant.
         const {error:signupError}=await supabase.auth.signUp({
           email:cleanEmail,password,
-          options:{data:{full_name:name.trim()},emailRedirectTo:window.location.origin+( /^(www\\.)?vipaz\\.com\\.br$/.test(window.location.hostname) ? '/juridico' : '' )+'/login'}
+          options:{data:{full_name:name.trim()},emailRedirectTo:window.location.origin+( ['vipaz.com.br', 'www.vipaz.com.br'].includes(window.location.hostname) ? '/juridico' : '' )+'/login'}
         });
         if(signupError)throw signupError;
         setNotice('Se o cadastro puder ser realizado, você receberá instruções no e-mail. Confirme o endereço e solicite ao administrador um convite para sua organização antes de entrar.');
         setPassword('');
       } else {
         const {error:resetError}=await supabase.auth.resetPasswordForEmail(cleanEmail,{
-          redirectTo:window.location.origin+( /^(www\\.)?vipaz\\.com\\.br$/.test(window.location.hostname) ? '/juridico' : '' )+'/redefinir-senha'
+          redirectTo:window.location.origin+( ['vipaz.com.br', 'www.vipaz.com.br'].includes(window.location.hostname) ? '/juridico' : '' )+'/redefinir-senha'
         });
         if(resetError)throw resetError;
         setNotice('Se existir uma conta para este e-mail, você receberá instruções para redefinir a senha.');
