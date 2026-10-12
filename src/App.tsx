@@ -17,7 +17,7 @@ import { StudioView } from './views/StudioView';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ShieldAlert, LogOut, ArrowRight, Loader2 } from 'lucide-react';
 
-const isVipazDomain = /^(www\.)?vipaz\.com\.br$/.test(window.location.hostname);
+const isVipazDomain = ['vipaz.com.br', 'www.vipaz.com.br'].includes(window.location.hostname);
 const appPrefix = isVipazDomain ? '/juridico' : '';
 const toPublicPath = (path: string) => appPrefix && path.startsWith('/') ? appPrefix + path : path;
 const toInternalPath = (path: string) => appPrefix && (path === appPrefix || path.startsWith(appPrefix + '/')) ? (path.slice(appPrefix.length) || '/') : path;
