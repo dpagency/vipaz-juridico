@@ -21,3 +21,6 @@ A arquitetura disponível é `arch_contestacao_pme_v1`, específica de contesta�
 
 ## Bloqueios de publicação
 Não homologar um documento por mero sucesso de build ou criação do DOCX. Bloquear a aprovação se houver variáveis `{{...}}`, blocos não homologados, dados de parte fixa incompatíveis, fatos não comprovados, referências não verificadas ou acesso entre organizações.
+
+## Evolução de fidelidade visual
+O renderizador determinístico passa a utilizar propriedades de tema para tamanho da fonte, cores e quatro margens de página. A validação OOXML verifica essas propriedades, mas **não certifica identidade de paginação com o documento de referência**. Comparação visual humana ainda obrigatória.
