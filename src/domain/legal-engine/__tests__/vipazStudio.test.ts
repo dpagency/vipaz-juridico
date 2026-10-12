@@ -42,7 +42,7 @@ async function run() {
   const fixture = new JSZip();
   const originalXml = '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>{d.processo.</w:t></w:r><w:r><w:t>numero}</w:t></w:r></w:p><w:p><w:r><w:t>Texto jurídico inalterado</w:t></w:r></w:p></w:body></w:document>';
   fixture.file('word/document.xml', originalXml);
-  const fixtureBlob = new Blob([await fixture.generateAsync({ type: 'uint8array' })]);
+  const fixtureBlob = new Blob([await fixture.generateAsync({ type: 'arraybuffer' })]);
   const inspection = await inspectStudioStructure(fixtureBlob);
   assert.equal(inspection.markers.length, 1, 'Placeholder dividido entre runs não identificado');
   assert.equal(inspection.markers[0].path, 'processo.numero');
