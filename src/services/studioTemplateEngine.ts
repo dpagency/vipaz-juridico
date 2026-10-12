@@ -106,7 +106,7 @@ export function validateStudioData(markers: StudioMarker[], data: StudioData): S
   return { missing: [...new Set(missing)], unsupported: [...new Set(unsupported)], available: [...new Set(available)] };
 }
 export function setStudioDataPath(data: StudioData, path: string, value: string): StudioData {
-  if (!/^[a-zA-Z_][\\w]*(?:\\.[a-zA-Z_][\\w]*)*$/.test(path) || path.split('.').some(k => ['__proto__', 'prototype', 'constructor'].includes(k))) throw new Error('Caminho de variável inválido');
+  if (!/^[a-zA-Z_][\w]*(?:\\.[a-zA-Z_][\\w]*)*$/.test(path) || path.split('.').some(k => ['__proto__', 'prototype', 'constructor'].includes(k))) throw new Error('Caminho de variável inválido');
   const copy: StudioData = JSON.parse(JSON.stringify(data));
   const keys = path.split('.');
   let cursor: StudioData = copy;
@@ -124,7 +124,7 @@ export function groupStudioLegalSections(paragraphs: StudioParagraph[]): StudioL
   for (const paragraph of paragraphs) {
     const text = paragraph.text.trim();
     if (!text) continue;
-    const heading = /^(?:[IVXLC]+[.)\\-]|\\d+(?:\\.\\d+)*[.)\\-])\\s+/.test(text) || /heading|title|titulo|título/i.test(paragraph.style) || (/^[A-ZÀ-Ú\\s]{8,}$/.test(text) && text.length < 130);
+    const heading = /^(?:[IVXLC]+[.)-]|\d+(?:\\.\\d+)*[.)\\-])\s+/.test(text) || /heading|title|titulo|título/i.test(paragraph.style) || (/^[A-ZÀ-Ú\\s]{8,}$/.test(text) && text.length < 130);
     if (heading) {
       const category = /PEDIDOS|REQUERIMENTOS|REQUER/i.test(text) ? 'pedido' : /MÉRITO|PRELIMINAR|TESE|REAJUSTE|CONTRATO/i.test(text) ? 'tese' : 'secao';
       sections.push({ heading: paragraph, paragraphs: [], category });
