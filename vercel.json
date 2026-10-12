@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    { "source": "/juridico", "destination": "/index.html" },
+    { "source": "/juridico/:path*", "destination": "/index.html" },
+    { "source": "/app/:path*", "destination": "/index.html" },
+    { "source": "/login", "destination": "/index.html" },
+    { "source": "/redefinir-senha", "destination": "/index.html" }
+  ]
+}
