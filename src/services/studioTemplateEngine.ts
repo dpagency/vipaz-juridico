@@ -20,10 +20,10 @@ function textOf(paragraph: string): string {
   return [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map(match => decodeXml(match[1])).join('');
 }
 function replaceText(paragraph: string, text: string): string {
-  const runs = [...paragraph.matchAll(/<w:t(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:t>/g)];
+  const runs = [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g)];
   if (!runs.length) return paragraph;
   let index = 0;
-  return paragraph.replace(/<w:t(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:t>/g, () => {
+  return paragraph.replace(/<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g, () => {
     const output = index++ === 0 ? xmlEscape(text) : '';
     return '<w:t xml:space="preserve">' + output + '</w:t>';
   });
@@ -31,9 +31,9 @@ function replaceText(paragraph: string, text: string): string {
 // Replace only the text nodes intersecting each placeholder. Other runs and their
 // typography remain untouched; replacement inherits the first marker run style.
 function replaceMarkersPreservingRuns(paragraph: string, data: StudioData, warnings: string[]): string {
-  const textNodes = [...paragraph.matchAll(/<w:t(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:t>/g)];
+  const textNodes = [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g)];
   if (!textNodes.length) return paragraph;
-  const texts = textNodes.map(node => decodeXml(node[0].replace(/^<w:t(?:\\s[^>]*)?>|<\\/w:t>$/g, '')));
+  const texts = textNodes.map(node => decodeXml(node[0].replace(/^<w:t(?:\s[^>]*)?>|<\/w:t>$/g, '')));
   const joined = texts.join('');
   const matches = [...joined.matchAll(markerRegex)];
   if (!matches.length) return paragraph;
@@ -57,7 +57,7 @@ function replaceMarkersPreservingRuns(paragraph: string, data: StudioData, warni
     }
   }
   let index = 0;
-  return paragraph.replace(/<w:t(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:t>/g, () => '<w:t xml:space="preserve">' + xmlEscape(texts[index++]) + '</w:t>');
+  return paragraph.replace(/<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g, () => '<w:t xml:space="preserve">' + xmlEscape(texts[index++]) + '</w:t>');
 }
 export function inspectStudioXml(xml: string): StudioMarker[] {
   const counts = new Map<string, StudioMarker>();
