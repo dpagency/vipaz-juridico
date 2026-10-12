@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { authService, AuthSession } from './services/authService';
 import { LandingPage } from './views/LandingPage';
+import { PlatformHome } from './views/PlatformHome';
 import { LoginPage } from './views/LoginPage';
 import { ResetPasswordPage } from './views/ResetPasswordPage';
 import { AppShell } from './components/AppShell';
@@ -72,13 +73,9 @@ function AppContent() {
     }
   };
 
-  // The institutional homepage is independent from the authenticated legal workspace.
+  // Domain root presents the cross-sector VIPAZ platform; /juridico remains the legal workspace.
   if (isVipazDomain && (window.location.pathname === '/' || window.location.pathname === '/index.html')) {
-    return <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-8 text-center">
-      <h1 className="text-5xl font-bold tracking-tight">VIPAZ</h1>
-      <p className="mt-5 max-w-lg text-slate-300">Tecnologia e soluções para transformar o trabalho profissional.</p>
-      <a className="mt-8 rounded-lg bg-cyan-600 px-6 py-3 font-semibold hover:bg-cyan-500" href="/juridico">Acessar VIPAZ Jurídico</a>
-    </main>;
+    return <PlatformHome />;
   }
 
   // Initial Auth Loading Screen
