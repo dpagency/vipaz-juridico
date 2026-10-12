@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/juridico/",
+      "destination": "/index.html"
+    },
+    {
       "source": "/juridico",
       "destination": "/index.html"
     },
