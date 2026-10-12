@@ -106,7 +106,7 @@ export function validateStudioData(markers: StudioMarker[], data: StudioData): S
   return { missing: [...new Set(missing)], unsupported: [...new Set(unsupported)], available: [...new Set(available)] };
 }
 export function setStudioDataPath(data: StudioData, path: string, value: string): StudioData {
-  if (!/^[a-zA-Z_][\w]*(?:\\.[a-zA-Z_][\\w]*)*$/.test(path) || path.split('.').some(k => ['__proto__', 'prototype', 'constructor'].includes(k))) throw new Error('Caminho de variável inválido');
+  if (!/^[a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)*$/.test(path) || path.split('.').some(k => ['__proto__', 'prototype', 'constructor'].includes(k))) throw new Error('Caminho de variável inválido');
   const copy: StudioData = JSON.parse(JSON.stringify(data));
   const keys = path.split('.');
   let cursor: StudioData = copy;
