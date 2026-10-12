@@ -91,9 +91,9 @@ export class DocumentRenderer {
                 new TextRun({
                   text: trimmed,
                   bold: true,
-                  size: 24, // 12pt
+                  size: theme.fontSizeHalfPoints, // tema
                   font: theme.fontFamily,
-                  color: '0F172A',
+                  color: theme.textColor,
                 }),
               ],
             })
@@ -109,9 +109,9 @@ export class DocumentRenderer {
                 new TextRun({
                   text: trimmed,
                   italics: true,
-                  size: 20, // 10pt
+                  size: Math.max(16, theme.fontSizeHalfPoints - 4), // citação
                   font: theme.fontFamily,
-                  color: '334155',
+                  color: theme.mutedColor,
                 }),
               ],
             })
@@ -125,9 +125,9 @@ export class DocumentRenderer {
               children: [
                 new TextRun({
                   text: trimmed,
-                  size: 24,
+                  size: theme.fontSizeHalfPoints,
                   font: theme.fontFamily,
-                  color: '0F172A',
+                  color: theme.textColor,
                 }),
               ],
             })
@@ -141,9 +141,9 @@ export class DocumentRenderer {
                 new TextRun({
                   text: trimmed,
                   bold: true,
-                  size: 24,
+                  size: theme.fontSizeHalfPoints,
                   font: theme.fontFamily,
-                  color: '0F172A',
+                  color: theme.textColor,
                 }),
               ],
             })
@@ -160,9 +160,9 @@ export class DocumentRenderer {
                 new TextRun({
                   text: trimmed,
                   bold: true,
-                  size: 24,
+                  size: theme.fontSizeHalfPoints,
                   font: theme.fontFamily,
-                  color: '0F172A',
+                  color: theme.textColor,
                 }),
               ],
             })
@@ -180,9 +180,9 @@ export class DocumentRenderer {
                 new TextRun({
                   text: trimmed,
                   bold: true,
-                  size: 22,
+                  size: theme.fontSizeHalfPoints,
                   font: theme.fontFamily,
-                  color: '0F172A',
+                  color: theme.textColor,
                 }),
               ],
             })
@@ -195,9 +195,9 @@ export class DocumentRenderer {
               children: [
                 new TextRun({
                   text: trimmed,
-                  size: 20,
+                  size: Math.max(16, theme.fontSizeHalfPoints - 4),
                   font: theme.fontFamily,
-                  color: '475569',
+                  color: theme.mutedColor,
                 }),
               ],
             })
@@ -212,9 +212,9 @@ export class DocumentRenderer {
               children: [
                 new TextRun({
                   text: trimmed,
-                  size: 24, // 12pt
+                  size: theme.fontSizeHalfPoints, // tema
                   font: theme.fontFamily,
-                  color: '0F172A',
+                  color: theme.textColor,
                 }),
               ],
             })
@@ -233,8 +233,8 @@ export class DocumentRenderer {
           document: {
             run: {
               font: theme.fontFamily,
-              size: 24,
-              color: '0F172A',
+              size: theme.fontSizeHalfPoints,
+              color: theme.textColor,
             },
           },
         },
@@ -244,10 +244,10 @@ export class DocumentRenderer {
           properties: {
             page: {
               margin: {
-                top: 1440, // 2.54 cm
-                bottom: 1440,
-                left: 1700, // ~3.0 cm
-                right: 1440, // 2.54 cm
+                top: theme.marginTopTwips,
+                bottom: theme.marginBottomTwips,
+                left: theme.marginLeftTwips,
+                right: theme.marginRightTwips,
               },
             },
           },
@@ -262,7 +262,7 @@ export class DocumentRenderer {
                       text: theme.headerText,
                       bold: true,
                       size: 16, // 8pt
-                      color: '64748B',
+                      color: theme.mutedColor,
                       font: theme.fontFamily,
                     }),
                   ],
@@ -280,25 +280,25 @@ export class DocumentRenderer {
                     new TextRun({
                       text: theme.footerText + ' | Página ',
                       size: 16,
-                      color: '94A3B8',
+                      color: theme.mutedColor,
                       font: theme.fontFamily,
                     }),
                     new TextRun({
                       children: [PageNumber.CURRENT],
                       size: 16,
-                      color: '94A3B8',
+                      color: theme.mutedColor,
                       font: theme.fontFamily,
                     }),
                     new TextRun({
                       text: ' de ',
                       size: 16,
-                      color: '94A3B8',
+                      color: theme.mutedColor,
                       font: theme.fontFamily,
                     }),
                     new TextRun({
                       children: [PageNumber.TOTAL_PAGES],
                       size: 16,
-                      color: '94A3B8',
+                      color: theme.mutedColor,
                       font: theme.fontFamily,
                     }),
                   ],
