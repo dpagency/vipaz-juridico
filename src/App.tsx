@@ -15,7 +15,7 @@ import { IndicadoresView } from './views/IndicadoresView';
 import { AdminToolsView } from './views/AdminToolsView';
 import { StudioView } from './views/StudioView';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { ShieldAlert, LogOut, ArrowRight, Loader2 } from 'lucide-react';
+import { ShieldAlert, LogOut, ArrowRight, Loader2, BellRing } from 'lucide-react';
 
 const isVipazDomain = ['vipaz.com.br', 'www.vipaz.com.br'].includes(window.location.hostname);
 const appPrefix = isVipazDomain ? '/juridico' : '';
@@ -318,6 +318,22 @@ function AppContent() {
             organization={currentOrg}
             onNavigate={navigate}
           />
+        </AppShell>
+      );
+    }
+
+    // VIPAZ Monitor: module entry point; publication ingestion remains a future integration.
+    const monitorMatch = currentPath.match(/^\\/app\\/([a-zA-Z0-9_-]+)\\/monitor$/);
+    if (monitorMatch) {
+      return (
+        <AppShell currentPath={currentPath} onNavigate={navigate} organization={currentOrg}
+          user={session.user} onLogout={handleLogout} onSwitchTenant={handleSwitchTenant}>
+          <section className="mx-auto max-w-3xl px-6 py-12 space-y-4">
+            <BellRing className="h-7 w-7 vipaz-text-brand" aria-hidden="true" />
+            <h1 className="text-2xl font-semibold vipaz-text-primary">VIPAZ Monitor</h1>
+            <p className="vipaz-text-muted">Monitoramento de publicações, eventos e providências jurídicas.</p>
+            <p className="text-sm vipaz-text-subtle">Módulo em preparação. A captura de publicações e o cálculo de prazos ainda não estão habilitados neste ambiente.</p>
+          </section>
         </AppShell>
       );
     }
