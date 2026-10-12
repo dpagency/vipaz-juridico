@@ -239,6 +239,32 @@ async function runSuite() {
     );
   });
 
+  // Gate PME: a montagem deve explicitar pendências, não ocultá-las.
+  await runTest('PME.1. Snapshot histórico não contém variáveis ou blocos pendentes', () => {
+    const result = assembleDocumentFromSnapshot(baseSnapshot);
+    assert(result.unresolvedVariables.length === 0, 'DOCX PME não pode conter variáveis não resolvidas');
+    assert(result.unhomologatedBlocks.length === 0, 'DOCX PME não pode conter blocos não homologados');
+  });
+
+  await runTest('PME.2. Condição de liminar não pode produzir teses contraditórias', () => {
+    const result = assembleDocumentFromSnapshot(baseSnapshot);
+    const keys = result.assembly.includedBlocks.map((block) => block.key);
+    assert(keys.includes('injunction_denied_block'), 'Snapshot histórico deve contemplar liminar indeferida');
+    assert(!keys.includes('injunction_granted_block'), 'Snapshot histórico não pode alegar liminar deferida');
+  });
+
+  await runTest('PME.3. Pedidos devem corresponder aos blocos associados', () => {
+    const result = assembleDocumentFromSnapshot(baseSnapshot);
+    const included = new Set(result.assembly.includedBlocks.map((block) => block.key));
+    const requests = new Set(result.assembly.includedRequests.map((request) => request.key));
+    const catalog = result.assembly.architecture.blocks;
+    for (const block of catalog) {
+      if (block.associatedRequestKey && included.has(block.key)) {
+        assert(requests.has(block.associatedRequestKey), 'Pedido associado ausente: ' + block.key);
+      }
+    }
+  });
+
   // Teste 11: Nenhuma chamada OpenAI
   await runTest('11. Nenhuma chamada OpenAI', () => {
     const serviceContent = fs.readFileSync('src/services/experimentalDocxService.ts', 'utf-8');
@@ -301,7 +327,7 @@ async function runSuite() {
   });
 
   console.log('==================================================');
-  console.log(`TOTAL DE TESTES DA GERAÇÃO EXPERIMENTAL APROVADOS: ${passedTests}/15`);
+  console.log(`TOTAL DE TESTES DA GERAÇÃO EXPERIMENTAL APROVADOS: ${passedTests}`);
   console.log('==================================================\n');
 }
 
