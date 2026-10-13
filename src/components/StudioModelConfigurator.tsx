@@ -30,6 +30,32 @@ export function StudioModelConfigurator({ markers, paragraphs, filename }: {
     if (!marker) return;
     setRules(old => ({ ...old, [expression]: { ...(old[expression] || initialRule(marker)), ...patch } }));
   };
+  const importConfig = async (file?: File) => {
+    if (!file) return;
+    try {
+      const data: unknown = JSON.parse(await file.text());
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Configuração inválida');
+      const config = data as { schemaVersion?: number; fields?: Array<Record<string, unknown>> };
+      if (config.schemaVersion !== 1 || !Array.isArray(config.fields)) throw new Error('Versão de configuração não suportada');
+      const known = new Set(unique.map(m => m.expression));
+      const next: Record<string, Rule> = {};
+      const allowed: Behavior[] = ['automatico', 'manual', 'condicional', 'ia_assistida', 'padronizado'];
+      for (const entry of config.fields) {
+        if (typeof entry.expression !== 'string' || !known.has(entry.expression)) continue;
+        if (!allowed.includes(entry.behavior as Behavior)) continue;
+        next[entry.expression] = {
+          behavior: entry.behavior as Behavior,
+          label: typeof entry.label === 'string' ? entry.label : entry.expression,
+          instructions: typeof entry.instructions === 'string' ? entry.instructions : '',
+          enabled: entry.enabled !== false,
+        };
+      }
+      setRules(next);
+      setNotice(Object.keys(next).length + ' marcadores configurados a partir do arquivo.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível importar a configuração.');
+    }
+  };
   const exportConfig = () => {
     const payload = {
       schemaVersion: 1, template: filename, purpose: 'contestacao_pme_reajustes',
@@ -75,7 +101,12 @@ export function StudioModelConfigurator({ markers, paragraphs, filename }: {
         </> : <p className="text-sm opacity-70">Selecione um marcador para definir seu comportamento na produção da peça.</p>}
       </div>
     </div>
-    <button type="button" className="rounded-lg bg-cyan-700 px-4 py-2 text-white font-semibold" onClick={exportConfig}>Exportar configuração do modelo (JSON)</button>
+    <div className="flex flex-wrap items-center gap-3">
+      <button type="button" className="rounded-lg bg-cyan-700 px-4 py-2 text-white font-semibold" onClick={exportConfig}>Exportar configuração do modelo (JSON)</button>
+      <label className="text-sm">Reabrir configuração salva
+        <input className="block mt-1 text-xs" type="file" accept=".json,application/json" onChange={e => void importConfig(e.target.files?.[0])} />
+      </label>
+    </div>
     {notice && <p role="status" className="text-sm">{notice}</p>}
     <p className="text-xs opacity-60">Esta etapa registra a configuração, mas não executa ainda as condições Carbone, as chamadas de IA ou a persistência no Supabase. O DOCX final dependerá da integração com o Delivery.</p>
   </section>;
