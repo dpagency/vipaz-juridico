@@ -18,8 +18,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ['VIPAZ Matters', `/app/${slug}/casos`, Scale, (p:string)=>p.includes('/casos')||p.includes('/caso/')],
     ['VIPAZ Monitor', `/app/${slug}/monitor`, BellRing, (p:string)=>p.endsWith('/monitor')],
     ['VIPAZ Studio', `/app/${slug}/studio`, FileCode2, (p:string)=>p.endsWith('/studio')],
-    ['VIPAZ Delivery', `/app/${slug}/nova-peca`, FolderKanban, (p:string)=>p.endsWith('/nova-peca')||p.includes('/geracoes/')||p.includes('/documentos')],
     ['VIPAZ Library', `/app/${slug}/biblioteca`, BookOpen, (p:string)=>p.includes('/biblioteca')],
+    ['VIPAZ Delivery', `/app/${slug}/nova-peca`, FolderKanban, (p:string)=>p.endsWith('/nova-peca')||p.includes('/geracoes/')||p.includes('/documentos')],
   ] as const;
   const go=(path:string)=>{onNavigate(path);onCloseMobile();};
 
