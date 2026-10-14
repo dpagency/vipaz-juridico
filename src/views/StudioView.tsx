@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { StudioModelConfigurator } from '../components/StudioModelConfigurator';
 import { groupStudioLegalSections, inspectStudioStructure, renderStudioDocx, setStudioDataPath, validateStudioData, type StudioParagraph, type StudioMarker } from '../services/studioTemplateEngine';
 
 const exampleData = {
@@ -70,6 +71,7 @@ export function StudioView() {
       {file && <p className="text-sm">{file.name} — {markers.length} expressões · {paragraphs.length} parágrafos · {tableCount} tabelas</p>}
       <p className="text-xs opacity-60">Arquivo processado localmente no navegador. Use apenas modelos sem dados pessoais reais durante a homologação.</p>
     </section>
+    {file && <StudioModelConfigurator key={file.name + file.size + file.lastModified} markers={markers} paragraphs={paragraphs} filename={file.name} />}
     {selectedMarker && <section className="rounded-xl border border-cyan-500/40 p-4 space-y-2">
       <h2 className="font-semibold">Configuração do campo selecionado</h2>
       <code className="block text-xs break-all">{'{d.' + selectedMarker + '}'}</code>
