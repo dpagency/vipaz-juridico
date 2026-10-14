@@ -64,17 +64,18 @@ export function StudioView() {
   }
 
   return <div className="max-w-6xl mx-auto px-5 py-8 space-y-6 text-slate-800 dark:text-slate-100">
-    <header><h1 className="text-2xl font-bold">VIPAZ Studio — Composição de Modelos</h1>
-      <p className="text-sm opacity-70">Importação, inspeção e preenchimento experimental de DOCX, sem Carbone ou OpenAI.</p></header>
-    <section className="rounded-xl border p-5 space-y-3">
-      <h2 className="font-semibold">1. Importar modelo DOCX</h2>
+    {file && <header><h1 className="text-2xl font-bold">VIPAZ Studio — Composição de Modelos</h1>
+      <p className="text-sm opacity-70">Importação, inspeção e preenchimento experimental de DOCX, com motor documental próprio em desenvolvimento.</p></header>}
+    <section className={file ? "rounded-xl border p-5 space-y-3" : "min-h-[65vh] flex flex-col items-center justify-center gap-6"}>
+      {!file && <h1 className="text-3xl font-bold">VIPAZ Studio</h1>}
+      {file && <h2 className="font-semibold">Modelo DOCX</h2>}
       <input aria-label="Importar modelo DOCX" type="file" accept=".docx" onChange={event => void openTemplate(event.target.files?.[0])} />
       {file && <p className="text-sm">{file.name} — {markers.length} expressões · {paragraphs.length} parágrafos · {tableCount} tabelas</p>}
-      <p className="text-xs opacity-60">Arquivo processado localmente no navegador. Use apenas modelos sem dados pessoais reais durante a homologação.</p>
+      {file && <p className="text-xs opacity-60">Arquivo processado localmente no navegador. Use apenas modelos sem dados pessoais reais durante a homologação.</p>}
     </section>
     {file && <StudioVisualEditor key={"visual-" + file.name + file.size + file.lastModified} filename={file.name} markers={markers} paragraphs={paragraphs} />}
     {file && <StudioModelConfigurator key={file.name + file.size + file.lastModified} markers={markers} paragraphs={paragraphs} filename={file.name} />}
-    {selectedMarker && <section className="rounded-xl border border-cyan-500/40 p-4 space-y-2">
+    {file && selectedMarker && <section className="rounded-xl border border-cyan-500/40 p-4 space-y-2">
       <h2 className="font-semibold">Configuração do campo selecionado</h2>
       <code className="block text-xs break-all">{'{d.' + selectedMarker + '}'}</code>
       <label className="block text-xs">Descrição funcional / regra de preenchimento (rascunho local)</label>
@@ -83,7 +84,7 @@ export function StudioView() {
       {selected?.kind !== 'field' && <p className="text-sm text-amber-600">Condição ou repetição Carbone: requer migração e homologação; geração bloqueada.</p>}
       <p className="text-xs opacity-60">Anotações não persistidas; a edição modifica apenas os dados fictícios, não as posições do modelo.</p>
     </section>}
-    <div className="grid md:grid-cols-2 gap-5">
+    {file && <div className="grid md:grid-cols-2 gap-5">
       <section className="rounded-xl border p-5 space-y-3">
         <h2 className="font-semibold">2. Placeholders encontrados</h2>
         <input aria-label="Filtrar placeholders" className="w-full rounded-lg border bg-transparent p-2 text-sm" placeholder="Filtrar por nome ou tipo" value={filter} onChange={event => setFilter(event.target.value)} />
@@ -97,7 +98,7 @@ export function StudioView() {
         <label htmlFor="studio-data" className="font-semibold">3. Dados fictícios (JSON)</label>
         <textarea id="studio-data" className="w-full h-96 rounded-lg border bg-transparent p-3 font-mono text-xs" value={json} onChange={event => setJson(event.target.value)} spellCheck={false} />
       </section>
-    </div>
+    </div>}
     {file && <section className="rounded-xl border p-5 space-y-2">
       <button type="button" onClick={() => setPreview(value => !value)} className="rounded-lg border px-4 py-2 text-sm">{preview ? 'Ocultar pré-visualização' : 'Pré-visualizar substituições'}</button>
       {preview && <div className="max-h-72 overflow-auto space-y-2">{paragraphs.filter(p => p.text.trim()).map(p => {
@@ -133,10 +134,10 @@ export function StudioView() {
           <span className="whitespace-pre-wrap break-words">{p.text}</span>
         </div>)}</div>
     </section>}
-    <button type="button" disabled={!file || busy || !validation || validation.missing.length > 0 || validation.unsupported.length > 0} onClick={() => void exportDocument()} className="rounded-lg bg-cyan-700 text-white px-5 py-3 font-semibold disabled:opacity-50">
+    {file && <button type="button" disabled={!file || busy || !validation || validation.missing.length > 0 || validation.unsupported.length > 0} onClick={() => void exportDocument()} className="rounded-lg bg-cyan-700 text-white px-5 py-3 font-semibold disabled:opacity-50">
       {busy ? 'Processando…' : '5. Gerar e baixar DOCX'}
-    </button>
+    </button>}
     {status && <p role="status" className="rounded-lg border p-3 text-sm whitespace-pre-wrap">{status}</p>}
-    <p className="text-xs opacity-60">Versão experimental: ainda não há edição visual de posições, tratamento completo de condições nem fidelidade verificada de modelos complexos. Não utilizar com dados reais antes da homologação.</p>
+    {file && <p className="text-xs opacity-60">Versão experimental: ainda não há edição visual de posições, tratamento completo de condições nem fidelidade verificada de modelos complexos. Não utilizar com dados reais antes da homologação.</p>}
   </div>;
 }
