@@ -2,8 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { StudioMarker, StudioParagraph } from '../services/studioTemplateEngine';
 
 type FieldType = 'text' | 'checkbox' | 'select' | 'condition' | 'ai' | 'repeat';
-type Binding = { id: string; type: FieldType; label: string; path: string; paragraphIndex: number; instructions: string; options: string[] };
+type Mode = 'required' | 'direct' | 'conditional' | 'combined';
+type Condition = { path: string; equals: string };
+type Binding = { id: string; type: FieldType; label: string; path: string; paragraphIndex: number; instructions: string; options: string[]; mode?: Mode; conditions?: Condition[]; operator?: 'AND' | 'OR' };
 type Saved = { schemaVersion: 2; template: string; bindings: Binding[] };
+const modes: Record<Mode, { label: string; color: string }> = {
+  required: { label: 'Inclusão Obrigatória', color: 'border-slate-400 bg-slate-100 text-slate-800' },
+  direct: { label: 'Preenchimento Direto', color: 'border-sky-400 bg-sky-100 text-sky-900' },
+  conditional: { label: 'Inclusão Condicionada', color: 'border-amber-400 bg-amber-100 text-amber-900' },
+  combined: { label: 'Inclusão Combinada', color: 'border-violet-400 bg-violet-100 text-violet-900' },
+};
 const types: Array<{ type: FieldType; title: string; hint: string }> = [
   { type: 'text', title: 'Texto / dado processual', hint: 'Preenchimento no Delivery' },
   { type: 'checkbox', title: 'Marcação', hint: 'Sim ou não' },
@@ -23,6 +31,7 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
   const storageKey = 'vipaz-studio-visual-v2:' + filename;
   const [bindings, setBindings] = useState<Binding[]>([]);
   const [active, setActive] = useState<string | null>(null);
+  const [selectedParagraph, setSelectedParagraph] = useState<number | null>(null);
   const [selectedSection, setSelectedSection] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   useEffect(() => {
@@ -40,18 +49,24 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
     return p.index >= selectedSection && (!next || p.index < next.index);
   });
   const selected = bindings.find(b => b.id === active);
-  const add = (type: FieldType, paragraphIndex: number, path?: string) => {
+  const selectedMode: Mode = selected?.mode || (selected?.type === 'condition' ? 'conditional' : 'direct');
+  const selectParagraph = (index: number) => { setSelectedParagraph(index); const existing = bindings.find(b => b.paragraphIndex === index); setActive(existing?.id || null); };
+  const setMode = (mode: Mode) => {
+    if (selected) update({ mode, conditions: mode === 'conditional' ? (selected.conditions?.slice(0, 1).length ? selected.conditions.slice(0, 1) : [{ path: 'flags.condicao', equals: 'sim' }]) : mode === 'combined' ? (selected.conditions?.length && selected.conditions.length >= 2 ? selected.conditions : [{ path: 'flags.condicao_a', equals: 'sim' }, { path: 'flags.condicao_b', equals: 'sim' }]) : [] });
+    else if (selectedParagraph !== null) add('text', selectedParagraph, undefined, mode);
+  };
+  const add = (type: FieldType, paragraphIndex: number, path?: string, requestedMode?: Mode) => {
     const p = paragraphs.find(item => item.index === paragraphIndex);
     if (!p) return;
     const id = 'f-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
     const value = path && safePath(path) ? path : 'campos.campo_' + id.replace(/-/g, '_');
-    const item: Binding = { id, type, label: types.find(t => t.type === type)?.title || 'Campo', path: value, paragraphIndex, instructions: '', options: type === 'select' ? ['Opção 1', 'Opção 2'] : [] };
-    setBindings(old => [...old, item]); setActive(id);
+    const item: Binding = { id, type, label: types.find(t => t.type === type)?.title || 'Campo', path: value, paragraphIndex, instructions: '', options: type === 'select' ? ['Opção 1', 'Opção 2'] : [], mode: requestedMode || (type === 'condition' ? 'conditional' : 'direct'), conditions: type === 'condition' || requestedMode === 'conditional' ? [{ path: 'flags.condicao', equals: 'sim' }] : [], operator: 'AND' };
+    setBindings(old => [...old, item]); setActive(id); setSelectedParagraph(paragraphIndex);
     setMessage('Componente vinculado ao parágrafo ' + (paragraphIndex + 1) + '.');
   };
   const update = (patch: Partial<Binding>) => setBindings(old => old.map(b => b.id === active ? { ...b, ...patch } : b));
   const save = () => {
-    if (bindings.some(b => !safePath(b.path))) { setMessage('Corrija os caminhos de dados antes de salvar.'); return; }
+    if (bindings.some(b => !safePath(b.path) || (['conditional','combined'].includes(b.mode || '') && ((b.conditions || []).length < (b.mode === 'combined' ? 2 : 1) || (b.conditions || []).some(c => !safePath(c.path) || !c.equals.trim()))))) { setMessage('Corrija os caminhos de dados antes de salvar.'); return; }
     try { window.localStorage.setItem(storageKey, JSON.stringify({ schemaVersion: 2, template: filename, bindings } satisfies Saved)); setMessage('Rascunho salvo neste navegador.'); }
     catch { setMessage('Não foi possível salvar no navegador. Exporte o JSON.'); }
   };
@@ -74,7 +89,8 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
         <label className="rounded border px-3 py-2 text-sm cursor-pointer">Importar mapa<input className="sr-only" type="file" accept=".json" onChange={e => void importJson(e.target.files?.[0])} /></label>
       </div>
     </header>
-    <div className="grid gap-3 lg:grid-cols-[minmax(150px,1fr)_minmax(180px,1.1fr)_minmax(0,2.5fr)]">
+    <div className="flex flex-wrap gap-2 text-xs">{(Object.keys(modes) as Mode[]).map(mode => <span key={mode} className={'rounded-lg border px-3 py-2 ' + modes[mode].color}>{modes[mode].label}</span>)}</div>
+    <div className="grid gap-3 lg:grid-cols-[minmax(140px,1fr)_minmax(170px,1fr)_minmax(0,2.8fr)]">
       <aside className="rounded-lg border p-3 space-y-2 min-w-0">
         <h3 className="font-semibold text-sm">A. Estrutura</h3>
         <button type="button" onClick={() => setSelectedSection(null)} className="block w-full text-left text-xs rounded border p-2">Documento completo</button>
@@ -99,18 +115,24 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
               const match = markers.find(m => m.expression === marker);
               if (match) add(match.kind === 'conditional' ? 'condition' : match.kind === 'repeat' ? 'repeat' : 'text', p.index, match.path);
             } else if (types.some(t => t.type === type)) add(type, p.index);
-          }} className="bg-white text-slate-900 rounded border border-dashed border-slate-300 p-3 hover:border-cyan-500">
-            <span className="block text-[10px] text-slate-400">Parágrafo {p.index + 1} · {p.style}</span>
+          }} onClick={() => selectParagraph(p.index)} className={'cursor-pointer rounded border-2 p-3 hover:border-cyan-500 ' + (selectedParagraph === p.index ? 'border-cyan-500 ' : 'border-dashed border-slate-300 ') + (bindings.find(b => b.paragraphIndex === p.index) ? modes[bindings.find(b => b.paragraphIndex === p.index)?.mode || 'direct'].color : 'bg-white text-slate-900')}>
+            <span className="block text-[10px] opacity-70">Parágrafo {p.index + 1} · {p.style} · {bindings.find(b => b.paragraphIndex === p.index) ? modes[bindings.find(b => b.paragraphIndex === p.index)?.mode || 'direct'].label : 'Inclusão Obrigatória'}</span>
             <p className={'whitespace-pre-wrap break-words text-sm ' + (section(p) ? 'font-bold' : '')}>{p.text || 'Espaço vazio'}</p>
-            {bindings.filter(b => b.paragraphIndex === p.index).map(b => <button key={b.id} type="button" onClick={() => setActive(b.id)} className={'inline-block mr-1 mt-2 rounded border px-2 py-1 text-xs ' + (active === b.id ? 'border-cyan-600 bg-cyan-100' : 'bg-slate-50')}>{b.label}</button>)}
+            {bindings.filter(b => b.paragraphIndex === p.index).map(b => <button key={b.id} type="button" onClick={e => { e.stopPropagation(); setSelectedParagraph(p.index); setActive(b.id); }} className={'inline-block mr-1 mt-2 rounded border px-2 py-1 text-xs ' + (active === b.id ? 'border-cyan-600 bg-cyan-100' : 'bg-slate-50')}>{b.label}</button>)}
           </div>)}
         </div>
       </main>
     </div>
+    {selectedParagraph !== null && <div className="rounded-lg border border-cyan-500/50 p-4 grid sm:grid-cols-2 gap-3">
+      <h3 className="font-semibold sm:col-span-2">Propriedades · Parágrafo {selectedParagraph + 1}</h3>
+      <div className="sm:col-span-2 grid grid-cols-2 lg:grid-cols-4 gap-2">{(Object.keys(modes) as Mode[]).map(mode => <button key={mode} type="button" onClick={() => setMode(mode)} className={'rounded-lg border-2 p-3 text-left text-xs font-semibold ' + modes[mode].color + (selectedMode === mode && selected ? ' ring-2 ring-cyan-500' : '')}>{modes[mode].label}</button>)}</div>
+      {!selected && <p className="sm:col-span-2 text-sm opacity-70">Este trecho pertence ao documento original e é incluído obrigatoriamente. Escolha outra propriedade para configurar um vínculo.</p>}
+    </div>}
     {selected && <div className="rounded-lg border border-cyan-500/50 p-4 grid sm:grid-cols-2 gap-3">
       <h3 className="font-semibold sm:col-span-2">Propriedades do componente</h3>
       <label className="text-sm">Nome no Delivery<input className="block w-full mt-1 rounded border bg-transparent p-2" value={selected.label} onChange={e => update({ label: e.target.value })}/></label>
       <label className="text-sm">Caminho dos dados<input className="block w-full mt-1 rounded border bg-transparent p-2" value={selected.path} onChange={e => update({ path: e.target.value })}/></label>
+      {(selectedMode === 'conditional' || selectedMode === 'combined') && <div className="sm:col-span-2 space-y-2"><h4 className="text-sm font-semibold">Respostas necessárias no Delivery</h4>{selectedMode === 'combined' && <label className="text-sm">Combinação <select className="ml-2 rounded border bg-transparent p-2" value={selected.operator || 'AND'} onChange={e => update({ operator: e.target.value as 'AND' | 'OR' })}><option value="AND">Todas (E)</option><option value="OR">Qualquer uma (OU)</option></select></label>}{(selected.conditions || []).map((condition, i) => <div key={i} className="grid sm:grid-cols-2 gap-2"><label className="text-xs">Campo do Delivery<input className="block w-full rounded border bg-transparent p-2" value={condition.path} onChange={e => update({ conditions: (selected.conditions || []).map((c,j) => j === i ? { ...c, path: e.target.value } : c) })}/></label><label className="text-xs">Resposta esperada<input className="block w-full rounded border bg-transparent p-2" value={condition.equals} onChange={e => update({ conditions: (selected.conditions || []).map((c,j) => j === i ? { ...c, equals: e.target.value } : c) })}/></label></div>)}{selectedMode === 'combined' && <button type="button" className="rounded border px-3 py-2 text-xs" onClick={() => update({ conditions: [...(selected.conditions || []), { path: 'flags.nova_condicao', equals: 'sim' }] })}>+ Adicionar condição</button>}</div>}
       {selected.type === 'select' && <label className="text-sm sm:col-span-2">Alternativas (uma por linha)<textarea className="block w-full mt-1 rounded border bg-transparent p-2" rows={3} value={selected.options.join('\n')} onChange={e => update({ options: e.target.value.split('\n').filter(Boolean) })}/></label>}
       <label className="text-sm sm:col-span-2">Regra / instrução para composição<textarea className="block w-full mt-1 rounded border bg-transparent p-2" rows={3} value={selected.instructions} onChange={e => update({ instructions: e.target.value })}/></label>
       <div className="sm:col-span-2"><button type="button" onClick={() => { setBindings(old => old.filter(b => b.id !== selected.id)); setActive(null); }} className="text-red-600 text-sm">Remover vínculo</button></div>
