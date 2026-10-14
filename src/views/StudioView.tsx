@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StudioModelConfigurator } from '../components/StudioModelConfigurator';
+import { StudioVisualEditor } from '../components/StudioVisualEditor';
 import { groupStudioLegalSections, inspectStudioStructure, renderStudioDocx, setStudioDataPath, validateStudioData, type StudioParagraph, type StudioMarker } from '../services/studioTemplateEngine';
 
 const exampleData = {
@@ -63,7 +64,7 @@ export function StudioView() {
   }
 
   return <div className="max-w-6xl mx-auto px-5 py-8 space-y-6 text-slate-800 dark:text-slate-100">
-    <header><h1 className="text-2xl font-bold">VIPAZ Studio — Laboratório de Modelos</h1>
+    <header><h1 className="text-2xl font-bold">VIPAZ Studio — Composição de Modelos</h1>
       <p className="text-sm opacity-70">Importação, inspeção e preenchimento experimental de DOCX, sem Carbone ou OpenAI.</p></header>
     <section className="rounded-xl border p-5 space-y-3">
       <h2 className="font-semibold">1. Importar modelo DOCX</h2>
@@ -71,6 +72,7 @@ export function StudioView() {
       {file && <p className="text-sm">{file.name} — {markers.length} expressões · {paragraphs.length} parágrafos · {tableCount} tabelas</p>}
       <p className="text-xs opacity-60">Arquivo processado localmente no navegador. Use apenas modelos sem dados pessoais reais durante a homologação.</p>
     </section>
+    {file && <StudioVisualEditor key={"visual-" + file.name + file.size + file.lastModified} filename={file.name} markers={markers} paragraphs={paragraphs} />}
     {file && <StudioModelConfigurator key={file.name + file.size + file.lastModified} markers={markers} paragraphs={paragraphs} filename={file.name} />}
     {selectedMarker && <section className="rounded-xl border border-cyan-500/40 p-4 space-y-2">
       <h2 className="font-semibold">Configuração do campo selecionado</h2>
