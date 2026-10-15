@@ -51,6 +51,7 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
   const [showOutline, setShowOutline] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [explainedMode, setExplainedMode] = useState<Mode | null>(null);
+  const [inlineExpanded, setInlineExpanded] = useState(false);
   const [message, setMessage] = useState('');
   useEffect(() => {
     try {
@@ -80,7 +81,7 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
     if (shift && groupStart !== null) { setGroupEnd(index); setModalOpen(false); setMessage('Intervalo selecionado. Use Agrupar parágrafos ou cancele a seleção.'); return; }
     setGroupStart(index); setGroupEnd(null); setPendingRange(null); setSelectedParagraph(index);
     const existing = bindings.find(b => !b.range && b.paragraphIndex <= index && (b.endParagraphIndex ?? b.paragraphIndex) >= index);
-    setActive(existing?.id || null); setModalOpen(true);
+    setActive(existing?.id || null); setInlineExpanded(false); setModalOpen(true);
   };
   const createGroup = () => {
     if (groupStart === null || groupEnd === null || groupStart === groupEnd) return;
@@ -97,13 +98,35 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
     const before = range.cloneRange(); before.selectNodeContents(element); before.setEnd(range.startContainer, range.startOffset);
     const start = before.toString().length; const end = start + range.toString().length;
     if (start >= end || end > p.text.length || bindings.some(b => b.paragraphIndex === p.index && b.range && start < b.range.end && end > b.range.start)) { setMessage('Selecione um trecho sem sobreposição com outros blocos internos.'); return; }
-    setSelectedParagraph(p.index); setActive(null); setPendingRange({ paragraphIndex: p.index, start, end }); setModalOpen(true);
+    setSelectedParagraph(p.index); setActive(null); setPendingRange({ paragraphIndex: p.index, start, end }); setInlineExpanded(true); setModalOpen(true);
     setMessage('Trecho selecionado: escolha uma propriedade para criar o bloco interno.');
   };
   const selectedText = selectedParagraph === null ? '' : paragraphs.find(p => p.index === selectedParagraph)?.text || '';
   const selectInlineFromModal = () => {
-    setModalOpen(false);
-    setMessage('Selecione com o mouse somente as palavras desejadas na peça-modelo. Ao soltar, o modal abrirá com o trecho destacado.');
+    setInlineExpanded(true);
+    setPendingRange(null);
+    setActive(null);
+    setMessage('Selecione uma palavra ou expressão na cópia do parágrafo dentro do modal.');
+  };
+  const captureModalRange = (element: HTMLElement) => {
+    if (selectedParagraph === null) return;
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount !== 1) return;
+    const range = selection.getRangeAt(0);
+    if (!element.contains(range.startContainer) || !element.contains(range.endContainer)) return;
+    const prefix = range.cloneRange();
+    prefix.selectNodeContents(element);
+    prefix.setEnd(range.startContainer, range.startOffset);
+    const start = prefix.toString().length, end = start + range.toString().length;
+    if (start >= end || end > selectedText.length) return;
+    if (bindings.some(b => b.paragraphIndex === selectedParagraph && b.range && start < b.range.end && end > b.range.start)) {
+      setMessage('Esse trecho se sobrepõe a uma expressão já configurada. Selecione outro intervalo.');
+      return;
+    }
+    setPendingRange({ paragraphIndex: selectedParagraph, start, end });
+    setActive(null);
+    selection.removeAllRanges();
+    setMessage('Expressão selecionada. Escolha abaixo a propriedade e configure os dados.');
   };
   const setMode = (mode: Mode) => {
     if (selected) update({ mode, conditions: mode === 'conditional' ? (selected.conditions?.slice(0, 1).length ? selected.conditions.slice(0, 1) : [{ path: 'flags.condicao', equals: 'sim' }]) : mode === 'combined' ? (selected.conditions?.length && selected.conditions.length >= 2 ? selected.conditions : [{ path: 'flags.condicao_a', equals: 'sim' }, { path: 'flags.condicao_b', equals: 'sim' }]) : [] });
@@ -139,7 +162,7 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
   const renderText = (p: StudioParagraph) => {
     const spans = bindings.filter(b => b.paragraphIndex === p.index && b.range).sort((a,b) => a.range!.start - b.range!.start);
     const nodes: React.ReactNode[] = []; let cursor = 0;
-    spans.forEach(b => { const r = b.range!; if (r.start < cursor) return; nodes.push(p.text.slice(cursor, r.start)); nodes.push(<mark key={b.id} onClick={e => { e.stopPropagation(); setSelectedParagraph(p.index); setPendingRange(null); setActive(b.id); setModalOpen(true); }} className={'rounded px-0.5 cursor-pointer border ' + modes[b.mode || 'direct'].color} title={b.label}>{p.text.slice(r.start, r.end)}</mark>); cursor = r.end; });
+    spans.forEach(b => { const r = b.range!; if (r.start < cursor) return; nodes.push(p.text.slice(cursor, r.start)); nodes.push(<mark key={b.id} onClick={e => { e.stopPropagation(); setSelectedParagraph(p.index); setPendingRange(null); setActive(b.id); setInlineExpanded(false); setModalOpen(true); }} className={'rounded px-0.5 cursor-pointer border ' + modes[b.mode || 'direct'].color} title={b.label}>{p.text.slice(r.start, r.end)}</mark>); cursor = r.end; });
     nodes.push(p.text.slice(cursor)); return nodes;
   };
   return <section className="rounded-xl border p-4 space-y-4">
@@ -197,13 +220,27 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
     {modalOpen && selectedParagraph !== null && <div role="presentation" className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onMouseDown={e => { if (e.target === e.currentTarget) setModalOpen(false); }}><div role="dialog" aria-modal="true" aria-label="Propriedades do bloco" className="w-full max-w-3xl max-h-[85vh] overflow-auto rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-xl space-y-4"><div className="flex justify-between items-center"><h2 className="font-semibold">Configurar bloco</h2><button type="button" className="rounded border px-3 py-1" onClick={() => setModalOpen(false)}>Fechar ✕</button></div><div className="grid sm:grid-cols-2 gap-3">
       <h3 className="font-semibold sm:col-span-2">Propriedades · Parágrafo {selectedParagraph + 1}{pendingRange ? ' · Trecho selecionado' : selected?.range ? ' · Bloco interno' : ''}</h3>
       <div className="sm:col-span-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
-        <strong>Área de aplicação:</strong> {pendingRange || selected?.range ? 'Somente o trecho selecionado' : selected?.endParagraphIndex !== undefined ? 'Grupo de parágrafos' : 'Parágrafo inteiro'}
-        {!pendingRange && !selected?.range && <div className="mt-2"><button type="button" onClick={selectInlineFromModal} className="rounded-md border border-sky-500 bg-white px-3 py-2 text-xs font-semibold hover:bg-sky-100">Configurar apenas palavras ou expressão deste parágrafo</button><p className="mt-1 text-xs">Clique para voltar à peça, selecione as palavras com o mouse e solte a seleção. O modal será reaberto para configurar somente o trecho.</p></div>}
-        {selectedText.length === 0 && <p className="text-xs mt-1">Este parágrafo não contém texto selecionável.</p>}
+        <strong>Área de aplicação:</strong> {pendingRange || selected?.range ? 'Somente a expressão selecionada' : selected?.endParagraphIndex !== undefined ? 'Grupo de parágrafos' : 'Parágrafo inteiro'}
+        {selected?.endParagraphIndex === undefined && selectedText.trim() && <div className="mt-2 space-y-2">
+          {!inlineExpanded && !selected?.range && <button type="button" onClick={selectInlineFromModal} className="rounded-md border border-sky-500 bg-white px-3 py-2 text-xs font-semibold hover:bg-sky-100">Configurar apenas palavras ou expressão deste parágrafo</button>}
+          {inlineExpanded && <>
+            <p className="text-xs"><strong>Selecione com o mouse</strong> as palavras desejadas na reprodução abaixo. As expressões já configuradas estão destacadas e não podem se sobrepor.</p>
+            <div className="rounded-lg border border-sky-300 bg-white p-3 text-slate-900">
+              <p onMouseUp={e => captureModalRange(e.currentTarget)} className="select-text whitespace-pre-wrap break-words leading-relaxed cursor-text">{selectedText}</p>
+            </div>
+            {pendingRange && <div className="rounded-md bg-sky-100 p-2 text-xs"><strong>Trecho selecionado:</strong> “{selectedText.slice(pendingRange.start, pendingRange.end)}”</div>}
+            {bindings.filter(b => b.paragraphIndex === selectedParagraph && b.range).length > 0 && <div className="space-y-1">
+              <p className="text-xs font-semibold">Expressões já configuradas:</p>
+              {bindings.filter(b => b.paragraphIndex === selectedParagraph && b.range).sort((a,b) => a.range!.start - b.range!.start).map(b => <button key={b.id} type="button" onClick={() => { setActive(b.id); setPendingRange(null); }} className={'block w-full text-left rounded border p-2 text-xs ' + modes[b.mode || 'direct'].color}>{selectedText.slice(b.range!.start, b.range!.end)} · {modes[b.mode || 'direct'].label}</button>)}
+            </div>}
+            {!pendingRange && <button type="button" onClick={() => { setActive(null); setPendingRange(null); setMessage('Selecione outra expressão na reprodução do parágrafo.'); }} className="rounded-md border border-sky-500 bg-white px-3 py-2 text-xs font-semibold">Configurar outras palavras ou expressão deste parágrafo</button>}
+          </>}
+        </div>}
+        {selected?.endParagraphIndex !== undefined && <p className="mt-2 text-xs">O agrupamento aplica propriedades ao conjunto de parágrafos. Para configurar palavras, desagrupe e abra um parágrafo isolado.</p>}
       </div>
       <div className="sm:col-span-2 grid grid-cols-2 lg:grid-cols-4 gap-2">{(Object.keys(modes) as Mode[]).map(mode => <button key={mode} type="button" onClick={() => setMode(mode)} className={'rounded-lg border-2 p-3 text-left text-xs font-semibold ' + modes[mode].color + (selectedMode === mode && selected ? ' ring-2 ring-cyan-500' : '')}>{modes[mode].label}</button>)}</div>
       {pendingRange && <p className="sm:col-span-2 text-sm">Trecho: <strong>{paragraphs.find(p => p.index === pendingRange.paragraphIndex)?.text.slice(pendingRange.start, pendingRange.end)}</strong></p>}
-      {!selected && <p className="sm:col-span-2 text-sm opacity-70">Este trecho pertence ao documento original e é incluído obrigatoriamente. Escolha outra propriedade para configurar um vínculo.</p>}
+      {!selected && <p className="sm:col-span-2 text-sm opacity-70">{pendingRange ? 'Selecione uma propriedade para a expressão destacada.' : 'Este trecho pertence ao documento original e é incluído obrigatoriamente. Escolha outra propriedade para configurar um vínculo.'}</p>}
     </div>
     {selected && <div className="rounded-lg border border-cyan-500/50 p-4 grid sm:grid-cols-2 gap-3">
       <h3 className="font-semibold sm:col-span-2">Propriedades do componente {selected.endParagraphIndex !== undefined ? '· Grupo até o parágrafo ' + (selected.endParagraphIndex + 1) : ''}</h3>
