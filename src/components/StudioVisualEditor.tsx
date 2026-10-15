@@ -172,7 +172,7 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
       <label className="text-sm sm:col-span-2">Regra / instrução para composição<textarea className="block w-full mt-1 rounded border bg-transparent p-2" rows={3} value={selected.instructions} onChange={e => update({ instructions: e.target.value })}/></label>
       <div className="sm:col-span-2"><button type="button" onClick={() => { setBindings(old => old.filter(b => b.id !== selected.id)); setActive(null); setModalOpen(false); }} className="text-red-600 text-sm">Remover vínculo</button></div>
     </div>}
-    {modalOpen && selectedParagraph !== null && </div></div>}
+    </div></div>}
     {message && <p role="status" className="text-sm">{message}</p>}
     <p className="text-xs opacity-60">Os trechos internos são mapeados por posições no texto importado; a aplicação dessas regras ao DOCX original e a geração no Delivery ainda não estão implementadas. A visualização é textual e não substitui a paginação do Word. Os vínculos são armazenados como mapa de composição; a inserção de novos marcadores no DOCX, a persistência no Supabase e a geração pelo Delivery exigem etapas próprias.</p>
   </section>;
