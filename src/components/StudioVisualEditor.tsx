@@ -161,7 +161,7 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
       <div className="sm:col-span-2 grid grid-cols-2 lg:grid-cols-4 gap-2">{(Object.keys(modes) as Mode[]).map(mode => <button key={mode} type="button" onClick={() => setMode(mode)} className={'rounded-lg border-2 p-3 text-left text-xs font-semibold ' + modes[mode].color + (selectedMode === mode && selected ? ' ring-2 ring-cyan-500' : '')}>{modes[mode].label}</button>)}</div>
       {pendingRange && <p className="sm:col-span-2 text-sm">Trecho: <strong>{paragraphs.find(p => p.index === pendingRange.paragraphIndex)?.text.slice(pendingRange.start, pendingRange.end)}</strong></p>}
       {!selected && <p className="sm:col-span-2 text-sm opacity-70">Este trecho pertence ao documento original e é incluído obrigatoriamente. Escolha outra propriedade para configurar um vínculo.</p>}
-    </div>}
+    </div>
     {selected && <div className="rounded-lg border border-cyan-500/50 p-4 grid sm:grid-cols-2 gap-3">
       <h3 className="font-semibold sm:col-span-2">Propriedades do componente {selected.endParagraphIndex !== undefined ? '· Grupo até o parágrafo ' + (selected.endParagraphIndex + 1) : ''}</h3>
       {selected.range && <p className="sm:col-span-2 text-xs opacity-70">Bloco interno: {paragraphs.find(p => p.index === selected.paragraphIndex)?.text.slice(selected.range.start, selected.range.end)}</p>}
