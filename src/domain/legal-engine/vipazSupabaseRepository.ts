@@ -7,9 +7,9 @@ export type VipazTrustedRepositoryOptions = {
   supabaseUrl: string;
   anonKey: string;
   accessToken: string;
-  /** Approved, page-indexed PDF extraction must be supplied by a trusted backend. */
+  /** Optional trusted extractor override; defaults to Supabase indexed pages. */
   loadExtractedPages?: (processId: string, organizationId: string) => Promise<VipazPage[]>;
-  /** Approved, versioned thesis registry must be supplied by a trusted backend. */
+  /** Optional trusted Library override; defaults to Supabase approved theses. */
   loadApprovedTheses?: (processId: string, organizationId: string) => Promise<VipazApprovedThesis[]>;
 };
 type AuthorizedContext = { organizationId: string; processId: string };
@@ -19,8 +19,7 @@ function requireUuid(value: string): void {
 }
 /**
  * Uses the caller's JWT and Supabase RLS; never uses service_role.
- * The callbacks are explicit because production does not yet contain
- * a verified page-extraction index or a versioned thesis registry.
+ * Page and thesis queries require the additive delivery migration to be applied.
  */
 export function createVipazSupabaseRepository(options: VipazTrustedRepositoryOptions): VipazTrustedCaseRepository {
   const client: SupabaseClient = createClient(options.supabaseUrl, options.anonKey, {
