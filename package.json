@@ -11,7 +11,8 @@
     "clean": "rm -rf dist server.js",
     "test": "tsx src/domain/legal-engine/__tests__/ruleEngine.test.ts && tsx src/domain/legal-engine/__tests__/snapshotPersistence.test.ts && tsx src/domain/legal-engine/__tests__/experimentalDocx.test.ts && tsx src/domain/legal-engine/__tests__/phase4_1_architecture.test.ts && tsx src/domain/legal-engine/__tests__/phase4_2_block_integrity.test.ts && tsx src/domain/legal-engine/__tests__/phase5_caw_integration.test.ts && tsx src/domain/legal-engine/__tests__/phase5_1_carbone_contract.test.ts && tsx src/domain/legal-engine/__tests__/phase5_2_caw_v2_sync.test.ts",
     "lint": "tsc --noEmit",
-    "test:studio": "tsx src/domain/legal-engine/__tests__/vipazStudio.test.ts"
+    "test:studio": "tsx src/domain/legal-engine/__tests__/vipazStudio.test.ts",
+    "test:delivery-quality": "tsx src/domain/legal-engine/__tests__/vipazCompositionContract.test.ts && tsx src/domain/legal-engine/__tests__/vipazMcpQualityTools.test.ts && tsx src/domain/legal-engine/__tests__/vipazDeliveryQualityGateway.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
