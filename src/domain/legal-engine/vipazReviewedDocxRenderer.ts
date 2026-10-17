@@ -37,14 +37,15 @@ export async function renderVipazReviewedDocx(input: VipazDocxInput): Promise<Bu
   const paragraphs: Paragraph[] = [];
   for (const rule of templateBlocks) {
     const heading = headings[rule.headingStyle ?? 'Normal'];
-    if (rule.title) paragraphs.push(paragraph(rule.title, heading ?? HeadingLevel.HEADING_2));
     if (rule.kind === 'fixed') {
+      if (rule.title) paragraphs.push(paragraph(rule.title, heading ?? HeadingLevel.HEADING_2));
       if (typeof rule.fixedText !== 'string') throw new Error('VIPAZ_TEMPLATE_FIXED_TEXT_MISSING: ' + rule.blockId);
       paragraphs.push(...rule.fixedText.split(/\r?\n/).map(line => paragraph(line)));
       continue;
     }
     const block = byId.get(rule.blockId);
     if (!block || (block.kind === 'conditional' && block.included === false)) continue;
+    if (rule.title) paragraphs.push(paragraph(rule.title, heading ?? HeadingLevel.HEADING_2));
     if (block.kind === 'repeated_theses') {
       for (const thesis of block.theses ?? []) {
         paragraphs.push(paragraph(thesis.title, heading ?? HeadingLevel.HEADING_2));
