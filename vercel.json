@@ -1,9 +1,29 @@
 {
   "rewrites": [
-    { "source": "/juridico", "destination": "/index.html" },
-    { "source": "/juridico/:path*", "destination": "/index.html" },
-    { "source": "/app/:path*", "destination": "/index.html" },
-    { "source": "/login", "destination": "/index.html" },
-    { "source": "/redefinir-senha", "destination": "/index.html" }
-  ]
+    {
+      "source": "/juridico",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/juridico/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/app/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/redefinir-senha",
+      "destination": "/index.html"
+    }
+  ],
+  "functions": {
+    "api/delivery/review.ts": {
+      "includeFiles": "dist/delivery-review.cjs"
+    }
+  }
 }
