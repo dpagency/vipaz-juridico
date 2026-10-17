@@ -65,9 +65,17 @@ export function validateVipazComposition(
   if (![composition.jobId, composition.templateId, composition.templateVersion, composition.processId].every(isText)) {
     issues.push({ code: 'INVALID_CONTEXT', message: 'Job, processo e versão do modelo são obrigatórios.' });
   }
+  if (!Array.isArray(rules) || !Array.isArray(composition.blocks)) {
+    issues.push({ code: 'INVALID_BLOCK_LIST', message: 'Modelo e lista de blocos devem ser listas válidas.' });
+    return issues;
+  }
   const allowed = new Map(rules.map((rule) => [rule.blockId, rule]));
   const seen = new Set<string>();
   for (const block of composition.blocks ?? []) {
+    if (!block || typeof block !== 'object' || !isText(block.blockId)) {
+      issues.push({ code: 'INVALID_BLOCK', message: 'Bloco inválido ou sem identificador.' });
+      continue;
+    }
     const rule = allowed.get(block.blockId);
     if (!rule) {
       issues.push({ code: 'UNKNOWN_BLOCK', blockId: block.blockId, message: 'Bloco não definido no Studio.' });
