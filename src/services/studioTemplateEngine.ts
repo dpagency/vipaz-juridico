@@ -28,6 +28,37 @@ function replaceText(paragraph: string, text: string): string {
     return '<w:t xml:space="preserve">' + output + '</w:t>';
   });
 }
+// Replace only the text nodes intersecting each placeholder. Other runs and their
+// typography remain untouched; replacement inherits the first marker run style.
+function replaceMarkersPreservingRuns(paragraph: string, data: StudioData, warnings: string[]): string {
+  const textNodes = [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g)];
+  if (!textNodes.length) return paragraph;
+  const texts = textNodes.map(node => decodeXml(node[0].replace(/^<w:t(?:\s[^>]*)?>|<\/w:t>$/g, '')));
+  const joined = texts.join('');
+  const matches = [...joined.matchAll(markerRegex)];
+  if (!matches.length) return paragraph;
+  const offsets: number[] = [];
+  let cursor = 0;
+  for (const text of texts) { offsets.push(cursor); cursor += text.length; }
+  for (const match of matches.reverse()) {
+    const start = match.index!, end = start + match[0].length;
+    const expression = match[1], value = resolve(data, pathOf(expression));
+    if (value === undefined || value === null) warnings.push('Campo ausente: ' + pathOf(expression));
+    const replacement = apply(value, expression);
+    const first = offsets.reduce((found, offset, i) => offset <= start ? i : found, -1);
+    const last = offsets.reduce((found, offset, i) => offset < end ? i : found, -1);
+    if (first < 0 || last < 0) continue;
+    const firstLocal = start - offsets[first], lastLocal = end - offsets[last];
+    if (first === last) texts[first] = texts[first].slice(0, firstLocal) + replacement + texts[first].slice(lastLocal);
+    else {
+      texts[first] = texts[first].slice(0, firstLocal) + replacement;
+      for (let i = first + 1; i < last; i++) texts[i] = '';
+      texts[last] = texts[last].slice(lastLocal);
+    }
+  }
+  let index = 0;
+  return paragraph.replace(/<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g, () => '<w:t xml:space="preserve">' + xmlEscape(texts[index++]) + '</w:t>');
+}
 export function inspectStudioXml(xml: string): StudioMarker[] {
   const counts = new Map<string, StudioMarker>();
   for (const match of xml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g)) {
@@ -42,12 +73,66 @@ export function inspectStudioXml(xml: string): StudioMarker[] {
   }
   return [...counts.values()];
 }
+export interface StudioParagraph { index: number; text: string; markers: string[]; style: string; }
+export interface StudioInspection { markers: StudioMarker[]; paragraphs: StudioParagraph[]; tables: number; }
+export async function inspectStudioStructure(file: Blob): Promise<StudioInspection> {
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  const xml = await zip.file('word/document.xml')?.async('string');
+  if (!xml) throw new Error('DOCX inválido: documento principal ausente');
+  const paragraphs: StudioParagraph[] = [...xml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g)].map((match, index) => {
+    const text = textOf(match[0]);
+    const style = match[0].match(/<w:pStyle\s+w:val="([^"]+)"/)?.[1] || 'Normal';
+    return { index, text, style, markers: [...text.matchAll(markerRegex)].map(item => item[1]) };
+  });
+  return { markers: inspectStudioXml(xml), paragraphs, tables: [...xml.matchAll(/<w:tbl(?:\s[^>]*)?>/g)].length };
+}
+
 export async function inspectStudioDocx(file: Blob): Promise<StudioMarker[]> {
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const xml = await zip.file('word/document.xml')?.async('string');
   if (!xml) throw new Error('O arquivo não contém word/document.xml');
   return inspectStudioXml(xml);
 }
+export interface StudioValidation { missing: string[]; unsupported: string[]; available: string[]; }
+export function validateStudioData(markers: StudioMarker[], data: StudioData): StudioValidation {
+  const missing: string[] = [], unsupported: string[] = [], available: string[] = [];
+  for (const marker of markers) {
+    if (marker.kind !== 'field') { unsupported.push(marker.expression); continue; }
+    const value = resolve(data, marker.path);
+    if (value === undefined || value === null || (typeof value === 'string' && !value.trim())) missing.push(marker.path);
+    else if (typeof value === 'object') unsupported.push(marker.expression);
+    else available.push(marker.path);
+  }
+  return { missing: [...new Set(missing)], unsupported: [...new Set(unsupported)], available: [...new Set(available)] };
+}
+export function setStudioDataPath(data: StudioData, path: string, value: string): StudioData {
+  if (!/^[a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)*$/.test(path) || path.split('.').some(k => ['__proto__', 'prototype', 'constructor'].includes(k))) throw new Error('Caminho de variável inválido');
+  const copy: StudioData = JSON.parse(JSON.stringify(data));
+  const keys = path.split('.');
+  let cursor: StudioData = copy;
+  for (const key of keys.slice(0, -1)) {
+    if (!cursor[key] || typeof cursor[key] !== 'object' || Array.isArray(cursor[key])) cursor[key] = {};
+    cursor = cursor[key] as StudioData;
+  }
+  cursor[keys[keys.length - 1]] = value;
+  return copy;
+}
+
+export interface StudioLegalSection { heading: StudioParagraph; paragraphs: StudioParagraph[]; category: 'tese' | 'pedido' | 'secao'; }
+export function groupStudioLegalSections(paragraphs: StudioParagraph[]): StudioLegalSection[] {
+  const sections: StudioLegalSection[] = [];
+  for (const paragraph of paragraphs) {
+    const text = paragraph.text.trim();
+    if (!text) continue;
+    const heading = /^(?:[IVXLC]+[.)-]|\d+(?:\\.\\d+)*[.)\\-])\s+/.test(text) || /heading|title|titulo|título/i.test(paragraph.style) || (/^[A-ZÀ-Ú\\s]{8,}$/.test(text) && text.length < 130);
+    if (heading) {
+      const category = /PEDIDOS|REQUERIMENTOS|REQUER/i.test(text) ? 'pedido' : /MÉRITO|PRELIMINAR|TESE|REAJUSTE|CONTRATO/i.test(text) ? 'tese' : 'secao';
+      sections.push({ heading: paragraph, paragraphs: [], category });
+    } else if (sections.length) sections[sections.length - 1].paragraphs.push(paragraph);
+  }
+  return sections;
+}
+
 export async function renderStudioDocx(file: Blob, data: StudioData): Promise<Blob> {
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const entry = zip.file('word/document.xml');
@@ -61,31 +146,7 @@ export async function renderStudioDocx(file: Blob, data: StudioData): Promise<Bl
       unsupported.map(marker => '{d.' + marker.expression + '}').join(', '));
   }
   const warnings: string[] = [];
-  const output = xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, paragraph => {
-    const text = textOf(paragraph);
-    const markers = [...text.matchAll(markerRegex)];
-    if (!markers.length) return paragraph;
-    const conditional = markers.find(m => m[1].includes(':ifEQ(false):drop(p)'));
-    if (conditional && resolve(data, pathOf(conditional[1])) === false) return '';
-    const repeat = markers.find(m => /\[i(?:\+1)?\]/.test(m[1]));
-    if (repeat) {
-      const value = resolve(data, pathOf(repeat[1]));
-      if (!Array.isArray(value)) { warnings.push('Lista ausente: ' + pathOf(repeat[1])); return ''; }
-      // A list is rendered as complete paragraphs; no fragile [i]/[i+1] pairing.
-      // Legacy templates may contain adjacent [i] and [i+1] paragraphs.
-      if (repeat[1].includes('[i+1]')) return '';
-      return value.map(item => replaceText(paragraph, text.replace(markerRegex, (_full, expr: string) =>
-        /\[i(?:\+1)?\]/.test(expr) ? apply(item, expr) : apply(resolve(data, pathOf(expr)), expr)
-      ))).join('');
-    }
-    const rendered = text.replace(markerRegex, (_full, expr: string) => {
-      if (expr.includes(':ifEQ(false):drop(p)')) return '';
-      const value = resolve(data, pathOf(expr));
-      if (value === undefined) warnings.push('Campo ausente: ' + pathOf(expr));
-      return apply(value, expr);
-    });
-    return replaceText(paragraph, rendered);
-  });
+  const output = xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, paragraph => replaceMarkersPreservingRuns(paragraph, data, warnings));
   if (warnings.length) throw new Error([...new Set(warnings)].join('\n'));
   zip.file('word/document.xml', output);
   const bytes = await zip.generateAsync({ type: 'uint8array' });
