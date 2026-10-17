@@ -58,7 +58,9 @@ export const vipazMcpTools: VipazMcpTools = {
         }
       }
     };
-    for (const block of composition.blocks ?? []) {
+    if (!Array.isArray(composition.blocks)) return issues;
+    for (const block of composition.blocks) {
+      if (!block || typeof block !== 'object') continue;
       if (block.kind === 'ai_draft') check(block.evidence, block.blockId);
       if (block.kind === 'repeated_theses') {
         for (const thesis of block.theses ?? []) {
