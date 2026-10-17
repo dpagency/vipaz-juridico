@@ -4,6 +4,7 @@ on:
     paths:
       - 'src/domain/legal-engine/**'
       - 'src/server/vipazDeliveryReviewHandler.ts'
+      - 'api/delivery/**'
       - 'server.ts'
       - 'package.json'
       - 'package-lock.json'
