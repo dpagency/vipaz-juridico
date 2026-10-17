@@ -8,9 +8,9 @@ export type VipazTrustedRepositoryOptions = {
   anonKey: string;
   accessToken: string;
   /** Approved, page-indexed PDF extraction must be supplied by a trusted backend. */
-  loadExtractedPages: (processId: string, organizationId: string) => Promise<VipazPage[]>;
+  loadExtractedPages?: (processId: string, organizationId: string) => Promise<VipazPage[]>;
   /** Approved, versioned thesis registry must be supplied by a trusted backend. */
-  loadApprovedTheses: (processId: string, organizationId: string) => Promise<VipazApprovedThesis[]>;
+  loadApprovedTheses?: (processId: string, organizationId: string) => Promise<VipazApprovedThesis[]>;
 };
 type AuthorizedContext = { organizationId: string; processId: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -62,13 +62,29 @@ export function createVipazSupabaseRepository(options: VipazTrustedRepositoryOpt
     },
     async getExtractedPages(processId) {
       const ctx = await context(processId);
-      const pages = await options.loadExtractedPages(processId, ctx.organizationId);
+      const pages = options.loadExtractedPages
+        ? await options.loadExtractedPages(processId, ctx.organizationId)
+        : await (async () => {
+          const { data, error } = await client.from('vipaz_extracted_pages')
+            .select('source_document_id,page_number,content')
+            .eq('organization_id', ctx.organizationId).eq('process_id', processId)
+            .order('page_number', { ascending: true });
+          if (error) throw new Error('VIPAZ_PAGES_NOT_AVAILABLE');
+          return (data ?? []).map(row => ({ documentId: row.source_document_id, page: row.page_number, text: row.content }));
+        })();
       if (!Array.isArray(pages)) throw new Error('VIPAZ_PAGES_NOT_AVAILABLE');
       return pages;
     },
     async getApprovedTheses(processId) {
       const ctx = await context(processId);
-      const theses = await options.loadApprovedTheses(processId, ctx.organizationId);
+      const theses = options.loadApprovedTheses
+        ? await options.loadApprovedTheses(processId, ctx.organizationId)
+        : await (async () => {
+          const { data, error } = await client.from('vipaz_approved_theses')
+            .select('id,title,version').eq('organization_id', ctx.organizationId).eq('status', 'approved');
+          if (error) throw new Error('VIPAZ_THESES_NOT_AVAILABLE');
+          return (data ?? []).map(row => ({ id: row.id, title: row.title, sourceVersion: row.version }));
+        })();
       if (!Array.isArray(theses)) throw new Error('VIPAZ_THESES_NOT_AVAILABLE');
       return theses;
     },
