@@ -1,0 +1,29 @@
+name: VIPAZ Delivery Quality
+on:
+  pull_request:
+    paths:
+      - 'src/domain/legal-engine/**'
+      - 'src/server/vipazDeliveryReviewHandler.ts'
+      - 'server.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/vipaz-delivery-quality.yml'
+  workflow_dispatch:
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Delivery unit and pipeline tests
+        run: npm run test:delivery-quality
+      - name: TypeScript check
+        run: npm run lint
+      - name: Production bundle
+        run: npm run build
