@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { createClient } from '@supabase/supabase-js';
 import { createVipazSupabaseRepository } from '../domain/legal-engine/vipazSupabaseRepository';
 import { produceVipazReviewDraft } from '../domain/legal-engine/vipazProductionPipeline';
 import type { VipazComposition } from '../domain/legal-engine/vipazCompositionContract';
@@ -15,6 +16,22 @@ export async function handleVipazDeliveryReview(req: Request, res: Response): Pr
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) { res.status(503).json({ error: 'Supabase indisponível.' }); return; }
+  // Authenticate the caller before inspecting any case or document identifiers.
+  // This uses the public anon key and never grants service-role access.
+  try {
+    const authClient = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await authClient.auth.getUser(token);
+    if (error || !data.user) {
+      res.status(401).json({ error: 'Sessão inválida.' });
+      return;
+    }
+  } catch (error) {
+    console.error('[VIPAZ Delivery] Falha na verificação de sessão', error instanceof Error ? error.message : 'erro desconhecido');
+    res.status(503).json({ error: 'Não foi possível verificar a sessão.' });
+    return;
+  }
   const composition = req.body?.composition as VipazComposition | undefined;
   if (!composition || typeof composition !== 'object' ||
       ![composition.jobId, composition.processId, composition.templateId].every(v => typeof v === 'string' && UUID.test(v)) ||
