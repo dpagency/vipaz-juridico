@@ -4,6 +4,7 @@ import 'dotenv/config';
 import { handleGenerateDocx } from './src/server/generateDocxHandler';
 import { handleLegalAiField } from './src/server/legalAiHandler';
 import { handleStartGeneration } from './src/server/startGenerationHandler';
+import { handleVipazDeliveryReview } from './src/server/vipazDeliveryReviewHandler';
 
 const PORT = 3000;
 const HOST = '0.0.0.0';
@@ -36,6 +37,11 @@ async function startServer() {
 
   app.post('/api/start-generation', (req, res) => {
     handleStartGeneration(req, res);
+  });
+
+  // Delivery review endpoint with JWT, tenant RLS and mandatory human review
+  app.post('/api/delivery/review', (req, res) => {
+    handleVipazDeliveryReview(req, res);
   });
 
   // Endpoint seguro de geração DOCX via motor CAW (n8n / Carbone)
