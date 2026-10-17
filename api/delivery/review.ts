@@ -1,14 +1,12 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { Request, Response } from 'express';
 import { handleVipazDeliveryReview } from '../../src/server/vipazDeliveryReviewHandler';
 
-/**
- * Vercel serverless entrypoint. The Express listener in server.ts is used
- * for local development and standalone hosting, not Vercel static deployments.
- */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+/** Vercel serverless entrypoint for the authenticated Delivery quality gateway. */
+export default async function handler(req: Request, res: Response): Promise<void> {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'Método não permitido.' });
+    res.status(405).json({ error: 'Método não permitido.' });
+    return;
   }
-  return handleVipazDeliveryReview(req as any, res as any);
+  await handleVipazDeliveryReview(req, res);
 }
