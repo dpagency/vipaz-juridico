@@ -64,7 +64,7 @@ export const vipazMcpTools: VipazMcpTools = {
       if (block.kind === 'ai_draft') check(block.evidence, block.blockId);
       if (block.kind === 'repeated_theses') {
         for (const thesis of block.theses ?? []) {
-          if (!approvedTheses.some(t => t.id === thesis.approvedSourceId && t.sourceVersion.trim())) {
+          if (!approvedTheses.some(t => t.id === thesis.approvedSourceId && t.sourceVersion.trim() && t.title.trim() === thesis.title.trim())) {
             issues.push({
               code: 'THESIS_NOT_APPROVED',
               blockId: block.blockId,
