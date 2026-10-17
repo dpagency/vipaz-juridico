@@ -41,11 +41,15 @@ export const vipazMcpTools: VipazMcpTools = {
   },
   verifyComposition(composition, rules, pages, approvedTheses) {
     const issues = validateVipazComposition(composition, rules);
-    const index = new Map(pages.map(p => [p.documentId + ':' + p.page, normalize(p.text)]));
+    const index = new Map<string, string[]>();
+    for (const page of pages) {
+      const key = page.documentId + ':' + page.page;
+      index.set(key, [...(index.get(key) ?? []), normalize(page.text)]);
+    }
     const check = (sources: VipazEvidence[] | undefined, blockId: string) => {
       for (const source of sources ?? []) {
-        const pageText = index.get(source.documentId + ':' + source.page);
-        if (!pageText || !normalize(source.excerpt) || !pageText.includes(normalize(source.excerpt))) {
+        const pageTexts = index.get(source.documentId + ':' + source.page);
+        if (!pageTexts?.length || !normalize(source.excerpt) || !pageTexts.some(text => text.includes(normalize(source.excerpt)))) {
           issues.push({
             code: 'EVIDENCE_NOT_FOUND',
             blockId,
