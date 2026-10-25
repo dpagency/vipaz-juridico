@@ -2,7 +2,11 @@ node_modules/
 build/
 dist/
 coverage/
+artifacts/
+src/server/*.bundle.cjs
+thread-chatgpt.md
 .DS_Store
 *.log
 .env*
 !.env.example
+.vercel

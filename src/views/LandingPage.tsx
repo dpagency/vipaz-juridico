@@ -1,112 +1,77 @@
-import React, { useEffect, useState } from 'react';
-import { ArrowRight, Check, ChevronRight, FileCheck2, FileText, Layers3, Library, Radar, Send, ShieldCheck, Sparkles, Workflow } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ArrowDown, ArrowRight, Check, ChevronDown, FileText, Layers3, Menu, ShieldCheck, Sparkles, Workflow, X } from 'lucide-react';
+import { VipazLogo } from '../components/VipazLogo';
+import { LegalFlowCanvas } from '../components/LegalFlowCanvas';
 
 interface LandingPageProps { onNavigate: (path: string) => void; }
 
-const journey = [
-  { name:'Caso', eyebrow:'01 · Compreender', title:'Centralize o contexto antes de redigir.', text:'Autos, partes, objeto da lide e informações relevantes passam a compor uma base estruturada para o trabalho jurídico.', detail:'O documento deixa de começar em uma página em branco: começa pela compreensão do caso.', icon:FileText },
-  { name:'Estratégia', eyebrow:'02 · Decidir', title:'Converta contexto em escolhas jurídicas.', text:'Regras, teses, preliminares e condicionantes são selecionadas conforme a natureza da demanda e os dados informados.', detail:'A automação apoia a decisão sem substituir a revisão profissional.', icon:Workflow },
-  { name:'Estrutura', eyebrow:'03 · Organizar', title:'Monte uma arquitetura coerente e auditável.', text:'Blocos homologados, conteúdo individualizado e campos assistidos são combinados em uma estrutura revisável antes da geração.', detail:'Você enxerga o mapa da peça antes de produzir o documento final.', icon:Layers3 },
-  { name:'Documento', eyebrow:'04 · Produzir', title:'Gere, revise e entregue com controle.', text:'O resultado permanece editável e segue para produção documental preservando a lógica jurídica definida ao longo do fluxo.', detail:'Da estrutura ao DOCX, cada etapa mantém rastreabilidade e possibilidade de revisão.', icon:FileCheck2 },
+const capabilities = [
+  { title:'Compreensão estruturada', text:'Autos, partes e fatos transformados em contexto operacional para a equipe.', icon:FileText },
+  { title:'Arquitetura jurídica', text:'Regras, teses e blocos validados organizados antes da redação.', icon:Layers3 },
+  { title:'Produção assistida', text:'IA aplicada com revisão humana, critérios visíveis e conteúdo editável.', icon:Sparkles },
+  { title:'Entrega rastreável', text:'Versões, decisões e documentos preservados do início ao resultado.', icon:ShieldCheck },
 ] as const;
 
-const modules = [
-  {name:'Matters',desc:'Organize casos, partes, documentos e contexto em um espaço de trabalho único.',verb:'Organizar',icon:Layers3},
-  {name:'Monitor',desc:'Acompanhe eventos, pendências e sinais que exigem atenção jurídica.',verb:'Acompanhar',icon:Radar},
-  {name:'Studio',desc:'Estruture e produza peças com regras, modelos e assistência de IA.',verb:'Produzir',icon:Sparkles},
-  {name:'Delivery',desc:'Conclua, versione e disponibilize documentos prontos para uso.',verb:'Entregar',icon:Send},
-  {name:'Library',desc:'Preserve modelos, blocos e conhecimento jurídico institucional validado.',verb:'Preservar',icon:Library},
+const layers = [
+  { name:'Contexto', kicker:'01 · Compreender', title:'Uma base única para cada caso.', text:'Centralize documentos, dados processuais, partes e informações relevantes antes de qualquer produção.' },
+  { name:'Estratégia', kicker:'02 · Decidir', title:'Decisões jurídicas com método.', text:'Aplique regras, teses, preliminares e condicionantes conforme o cenário concreto e os padrões da organização.' },
+  { name:'Estrutura', kicker:'03 · Organizar', title:'Veja a peça antes de gerá-la.', text:'Revise a arquitetura, a ordem dos argumentos e os blocos aplicáveis antes da composição documental.' },
+  { name:'Documento', kicker:'04 · Entregar', title:'Produção consistente e auditável.', text:'Gere documentos editáveis preservando decisões, autoria, versões e rastreabilidade do processo.' },
 ] as const;
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
-  const [activeStep,setActiveStep]=useState(0);
-  const [activeModule,setActiveModule]=useState(2);
-  const [autoPlay,setAutoPlay]=useState(true);
+  const heroRef=useRef<HTMLElement>(null); const heroGlowRef=useRef<HTMLDivElement>(null);
+  const [scrolled,setScrolled]=useState(false);
+  const [menuOpen,setMenuOpen]=useState(false);
+  const [activeLayer,setActiveLayer]=useState(0);
+  useEffect(()=>{const onScroll=()=>setScrolled(window.scrollY>24);onScroll();window.addEventListener('scroll',onScroll,{passive:true});return()=>window.removeEventListener('scroll',onScroll);},[]);
 
-  useEffect(()=>{
-    if(!autoPlay) return;
-    const timer=window.setInterval(()=>setActiveStep(step=>(step+1)%journey.length),5200);
-    return ()=>window.clearInterval(timer);
-  },[autoPlay]);
+  return <div className="min-h-screen bg-white text-[#111] selection:bg-[#20D7E8] selection:text-black">
+    <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${scrolled?'bg-white text-black shadow-[0_1px_0_rgba(0,0,0,.12)]':'bg-transparent text-white'}`}>
+      <div className="mx-auto flex h-[78px] max-w-[1440px] items-center justify-between px-6 lg:px-12">
+        <button onClick={()=>onNavigate('/')}><VipazLogo inverse={!scrolled}/></button>
+        <nav className="hidden items-center gap-9 text-xs font-bold lg:flex">
+          {['Plataforma','Soluções','Método','Recursos'].map(item=><a key={item} href={`#${item.toLowerCase().replace('ç','c')}`} className="group flex items-center gap-1.5 transition-opacity hover:opacity-60">{item}<ChevronDown className="h-3 w-3 transition-transform group-hover:rotate-180"/></a>)}
+        </nav>
+        <div className="hidden items-center lg:flex"><button onClick={()=>onNavigate('/login')} className="rounded-xl bg-[#20D7E8] px-6 py-4 text-xs font-bold text-black transition hover:bg-white">Acessar plataforma</button></div>
+        <button onClick={()=>setMenuOpen(v=>!v)} className="lg:hidden" aria-label="Alternar menu">{menuOpen?<X/>:<Menu/>}</button>
+      </div>
+      {menuOpen&&<div className="border-t border-black/10 bg-white p-6 text-black lg:hidden">{['Plataforma','Soluções','Método','Recursos'].map(item=><a key={item} href={`#${item.toLowerCase().replace('ç','c')}`} onClick={()=>setMenuOpen(false)} className="block border-b border-black/10 py-4 text-lg font-semibold">{item}</a>)}<button onClick={()=>onNavigate('/login')} className="mt-6 w-full rounded-xl bg-[#20D7E8] p-4 text-sm font-bold">Acessar plataforma</button></div>}
+    </header>
 
-  const step=journey[activeStep];
-  const StepIcon=step.icon;
-
-  return (
-    <div className="min-h-screen bg-[#080b10] text-white selection:bg-cyan-300/20">
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-white/[.06] bg-[#080b10]/85 backdrop-blur-xl">
-        <div className="mx-auto h-[72px] max-w-[1320px] px-6 lg:px-10 flex items-center justify-between">
-          <button onClick={()=>onNavigate('/')} className="flex items-baseline gap-2"><span className="font-editorial text-[22px] font-bold tracking-tight">VIPAZ</span><span className="text-[11px] text-cyan-300">Jurídico</span></button>
-          <div className="flex items-center gap-3">
-            <button onClick={()=>onNavigate('/login')} className="px-3 py-2 text-[12px] text-white/60 hover:text-white transition">Entrar</button>
-            <button onClick={()=>onNavigate('/login')} className="rounded-full bg-white px-4 py-2 text-[12px] font-semibold text-black hover:bg-cyan-100 transition">Acessar plataforma</button>
+    <main>
+      <section ref={heroRef} id="plataforma" onPointerMove={event=>{if(!heroRef.current||!heroGlowRef.current)return;const bounds=heroRef.current.getBoundingClientRect();heroGlowRef.current.style.left=`${((event.clientX-bounds.left)/bounds.width)*100}%`;heroGlowRef.current.style.top=`${((event.clientY-bounds.top)/bounds.height)*100}%`;}} className="relative grid min-h-screen overflow-hidden bg-[#101417] text-white lg:grid-cols-2">
+        <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:44px_44px]"/>
+        <div ref={heroGlowRef} className="pointer-events-none absolute left-1/2 top-1/2 z-[5] h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#20D7E8]/15 blur-3xl transition-[left,top] duration-300"/>
+        <div className="relative z-10 flex min-h-[70vh] flex-col justify-end border-b border-white/10 px-6 pb-12 pt-32 lg:min-h-screen lg:border-b-0 lg:border-r lg:px-12 lg:pb-16">
+          <div className="relative">
+            <h1 className="max-w-3xl text-[clamp(3.7rem,6.6vw,7.2rem)] font-medium leading-[.91] tracking-[-.06em]">Produção jurídica de alta performance</h1>
+            <p className="mt-8 max-w-xl text-base font-semibold leading-7 text-white/65">O VIPAZ conecta contexto, método e inteligência para transformar conhecimento jurídico em entregas consistentes.</p>
+            <a href="#metricas" className="mt-12 flex w-fit items-center gap-3 text-[10px] font-bold uppercase tracking-[.18em] text-white/45">Explorar <ArrowDown className="h-4 w-4 animate-bounce"/></a>
           </div>
         </div>
-      </header>
+        <div className="relative z-10 min-h-[70vh] lg:min-h-screen">
+          <div className="absolute inset-0"><LegalFlowCanvas transparent/></div>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/55"/>
+        </div>
+      </section>
 
-      <main>
-        <section className="pt-40 pb-20 px-6">
-          <div className="mx-auto max-w-[1180px] grid lg:grid-cols-12 gap-14 items-end">
-            <div className="lg:col-span-8">
-              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-300/[.04] px-3 py-1.5 text-[10px] uppercase tracking-[.18em] text-cyan-300"><span className="h-1.5 w-1.5 rounded-full bg-cyan-300 animate-pulse"/>Produção jurídica estruturada</div>
-              <h1 className="max-w-[900px] text-[clamp(3.3rem,7.3vw,7.2rem)] leading-[.91] tracking-[-.055em] font-semibold">Do caso ao documento.<span className="block text-white/35">Com método.</span></h1>
-            </div>
-            <div className="lg:col-span-4 lg:pb-3">
-              <p className="text-[15px] leading-7 text-white/55 max-w-sm">Organize o contexto, aplique regras jurídicas, use IA de forma assistida e transforme uma estrutura revisada em um documento profissional.</p>
-              <button onClick={()=>onNavigate('/login')} className="mt-8 inline-flex items-center gap-3 text-[13px] font-semibold group">Começar agora <span className="grid h-9 w-9 place-items-center rounded-full border border-white/20 group-hover:bg-white group-hover:text-black transition"><ArrowRight className="w-4 h-4"/></span></button>
-            </div>
-          </div>
-          <div className="mx-auto max-w-[1180px] mt-20 grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl overflow-hidden border border-white/[.07] bg-white/[.07]">
-            {[['01','Contexto estruturado'],['02','Regras aplicáveis'],['03','Revisão humana'],['04','Documento editável']].map(([n,label])=><div key={n} className="bg-[#0a0e14] px-5 py-4 flex items-center gap-3"><span className="text-[10px] font-mono text-cyan-300/70">{n}</span><span className="text-[11px] text-white/55">{label}</span></div>)}
-          </div>
-        </section>
+      <section id="metricas" className="bg-[#F3F3F0] px-6 py-16 lg:px-12"><div className="mx-auto grid max-w-[1344px] gap-px overflow-hidden rounded-2xl bg-black/15 sm:grid-cols-2 lg:grid-cols-4">{[['100%','Revisável'],['04','Etapas conectadas'],['01','Fonte de verdade'],['24/7','Workspace disponível']].map(([value,label])=><div key={label} className="bg-[#F3F3F0] px-6 py-8"><div className="text-5xl font-medium tracking-[-.06em]">{value}</div><div className="mt-3 text-xs font-bold text-black/55">{label}</div></div>)}</div></section>
 
-        <section className="border-y border-white/[.07] px-6 py-20">
-          <div className="mx-auto max-w-[1180px]">
-            <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-5">
-              <div><div className="text-[10px] uppercase tracking-[.18em] text-cyan-300 mb-3">Fluxo de produção</div><h2 className="text-3xl sm:text-4xl tracking-[-.035em] font-semibold">Entenda como o VIPAZ trabalha.</h2></div>
-              <p className="max-w-md text-[13px] leading-6 text-white/40">Explore cada etapa. O fluxo avança automaticamente ou pode ser controlado por você.</p>
-            </div>
-            <div className="grid md:grid-cols-4 gap-px bg-white/[.08] border border-white/[.08] rounded-2xl overflow-hidden">
-              {journey.map((item,i)=><button key={item.name} onClick={()=>{setActiveStep(i);setAutoPlay(false)}} className={`group text-left p-6 min-h-32 flex flex-col justify-between transition ${activeStep===i?'bg-cyan-300/[.08]':'bg-[#080b10] hover:bg-white/[.025]'}`}><div className="flex justify-between"><span className={`text-[10px] font-mono ${activeStep===i?'text-cyan-300':'text-white/25'}`}>0{i+1}</span>{activeStep===i&&<span className="h-1.5 w-1.5 rounded-full bg-cyan-300"/>}</div><div className="flex items-center justify-between"><span className="text-[16px] font-medium">{item.name}</span><ChevronRight className={`w-4 h-4 transition ${activeStep===i?'text-cyan-300 translate-x-0':'text-white/15 -translate-x-1 group-hover:translate-x-0'}`}/></div></button>)}
-            </div>
-            <div className="mt-5 rounded-2xl border border-white/[.08] bg-[#0d1118] p-7 md:p-9 grid md:grid-cols-12 gap-8 min-h-[250px]">
-              <div className="md:col-span-2"><div className="w-11 h-11 rounded-xl border border-cyan-300/20 bg-cyan-300/[.05] grid place-items-center"><StepIcon className="w-5 h-5 text-cyan-300"/></div></div>
-              <div className="md:col-span-6"><div className="text-[10px] uppercase tracking-[.16em] text-cyan-300 mb-3">{step.eyebrow}</div><h3 className="text-2xl sm:text-3xl font-semibold tracking-[-.03em]">{step.title}</h3><p className="mt-4 max-w-xl text-[13px] leading-6 text-white/50">{step.text}</p></div>
-              <div className="md:col-span-4 md:border-l border-white/[.08] md:pl-8 flex flex-col justify-between"><p className="text-[12px] leading-6 text-white/40">{step.detail}</p><button onClick={()=>onNavigate('/login')} className="mt-6 inline-flex items-center gap-2 text-[12px] text-white/70 hover:text-cyan-300 transition">Conhecer na plataforma <ArrowRight className="w-3.5 h-3.5"/></button></div>
-            </div>
-          </div>
-        </section>
+      <section id="solucoes" className="px-6 py-24 lg:px-12 lg:py-36"><div className="mx-auto max-w-[1344px]">
+        <div className="grid gap-12 lg:grid-cols-12"><h2 className="text-5xl font-medium leading-[.98] tracking-[-.055em] sm:text-7xl lg:col-span-7">Construído na prática.<br/>Preparado para pressão.</h2><div className="lg:col-span-4 lg:col-start-9"><p className="text-base leading-7 text-black/65">Uma plataforma pensada para ambientes jurídicos reais — com prazos, múltiplos casos, critérios institucionais e responsabilidade profissional.</p></div></div>
+        <div className="mt-20 grid overflow-hidden rounded-2xl border border-black/15 sm:grid-cols-2 lg:grid-cols-4">{capabilities.map(({title,text,icon:Icon},i)=><article key={title} className="group min-h-[330px] border-b border-black/15 p-6 transition-colors hover:bg-[#20D7E8] sm:border-r lg:border-b-0"><div className="flex justify-between"><span className="text-xs font-mono text-black/40">0{i+1}</span><Icon className="h-5 w-5"/></div><div className="mt-32"><h3 className="text-xl font-bold tracking-[-.03em]">{title}</h3><p className="mt-4 text-sm leading-6 text-black/55 group-hover:text-black/70">{text}</p></div></article>)}</div>
+      </div></section>
 
-        <section className="px-6 py-28">
-          <div className="mx-auto max-w-[1180px]">
-            <div className="grid lg:grid-cols-12 gap-12 mb-14">
-              <h2 className="lg:col-span-7 text-4xl sm:text-5xl tracking-[-.04em] font-semibold">Um sistema jurídico.<br/><span className="text-white/35">Cinco módulos conectados.</span></h2>
-              <p className="lg:col-span-4 lg:col-start-9 text-sm leading-6 text-white/45">Passe o cursor ou selecione um módulo para entender seu papel dentro do ciclo de trabalho.</p>
-            </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-5 border-y border-white/10">
-              {modules.map((item,i)=>{const Icon=item.icon;const active=activeModule===i;return <button key={item.name} onMouseEnter={()=>setActiveModule(i)} onFocus={()=>setActiveModule(i)} onClick={()=>setActiveModule(i)} className={`text-left py-7 px-5 first:pl-0 border-b lg:border-b-0 lg:border-r last:border-r-0 border-white/10 transition ${active?'bg-white/[.025]':''}`}><div className="flex justify-between items-start"><Icon className={`w-4 h-4 mb-10 ${active?'text-cyan-300':'text-white/35'}`}/><span className="text-[9px] uppercase tracking-wider text-white/20">{item.verb}</span></div><h3 className="text-[15px] font-semibold">{item.name}</h3><p className={`mt-2 text-[12px] leading-5 transition ${active?'text-white/60':'text-white/35'}`}>{item.desc}</p></button>})}
-            </div>
-          </div>
-        </section>
+      <section id="metodo" className="bg-[#111] px-6 py-24 text-white lg:px-12 lg:py-32"><div className="mx-auto max-w-[1344px]">
+        <div className="grid gap-10 lg:grid-cols-12"><div className="lg:col-span-5"><span className="text-xs font-bold uppercase tracking-[.16em] text-[#20D7E8]">Um ecossistema. Totalmente conectado.</span><h2 className="mt-6 text-5xl font-medium leading-[.98] tracking-[-.05em] sm:text-7xl">Cada camada funciona sozinha. Juntas, mudam a resposta.</h2></div><div className="lg:col-span-6 lg:col-start-7"><div className="border-t border-white/20">{layers.map((layer,i)=><button key={layer.name} onClick={()=>setActiveLayer(i)} className="w-full border-b border-white/20 py-5 text-left"><div className="flex items-center justify-between"><span className={`text-xl font-semibold ${activeLayer===i?'text-[#20D7E8]':'text-white/55'}`}>{layer.name}</span><span className="text-2xl">{activeLayer===i?'−':'+'}</span></div>{activeLayer===i&&<div className="animate-in fade-in slide-in-from-top-2 duration-300"><div className="mt-7 text-[10px] font-bold uppercase tracking-[.16em] text-white/40">{layer.kicker}</div><h3 className="mt-3 text-3xl font-medium">{layer.title}</h3><p className="mt-4 max-w-lg text-sm leading-6 text-white/55">{layer.text}</p></div>}</button>)}</div></div></div>
+      </div></section>
 
-        <section className="px-6 pb-28">
-          <div className="mx-auto max-w-[1180px] rounded-[28px] bg-[#0d1118] border border-white/[.07] p-8 sm:p-12 lg:p-16 grid lg:grid-cols-2 gap-14">
-            <div><ShieldCheck className="w-5 h-5 text-cyan-300 mb-8"/><div className="text-[10px] uppercase tracking-[.16em] text-white/30 mb-3">Controle profissional</div><h2 className="text-3xl sm:text-4xl tracking-[-.035em] font-semibold">Tecnologia sem tirar o advogado do centro.</h2><p className="mt-5 text-[13px] leading-6 text-white/40 max-w-md">Automação e IA entram onde agregam velocidade. Decisão, revisão e validação permanecem visíveis e controláveis.</p></div>
-            <div className="space-y-5 text-[13px] text-white/50">
-              {['Arquiteturas e modelos jurídicos validados.','Automação determinística para decisões estruturais.','Inteligência artificial opcional, assistida e editável.','Revisão da estrutura antes da produção documental.','Conhecimento institucional preservado para reutilização.'].map((x,i)=><div key={x} className="group flex gap-4 border-b border-white/[.07] pb-5"><span className="text-[10px] font-mono text-white/20">0{i+1}</span><Check className="w-4 h-4 text-cyan-300 shrink-0"/><span className="group-hover:text-white/75 transition">{x}</span></div>)}
-            </div>
-          </div>
-        </section>
+      <section id="recursos" className="grid min-h-[720px] lg:grid-cols-2"><div className="relative min-h-[480px] overflow-hidden"><LegalFlowCanvas compact/></div><div className="flex flex-col justify-center bg-[#20D7E8] p-8 sm:p-14 lg:p-20"><Workflow className="h-8 w-8"/><span className="mt-16 text-xs font-bold uppercase tracking-[.16em]">Responsabilidade centralizada</span><h2 className="mt-5 text-5xl font-medium leading-[.95] tracking-[-.055em] sm:text-7xl">Um método.<br/>Uma fonte.<br/>Um resultado.</h2><div className="mt-10 space-y-4">{['Contexto preservado do início ao fim','Conhecimento institucional reutilizável','Decisões visíveis e auditáveis'].map(x=><div key={x} className="flex items-center gap-3 border-t border-black/20 pt-4 text-sm font-bold"><Check className="h-4 w-4"/>{x}</div>)}</div></div></section>
 
-        <section className="px-6 py-28 border-t border-white/[.07]">
-          <div className="mx-auto max-w-[1180px] flex flex-col lg:flex-row lg:items-end justify-between gap-10">
-            <div><div className="text-[10px] uppercase tracking-[.18em] text-cyan-300 mb-4">VIPAZ Jurídico</div><h2 className="text-4xl sm:text-6xl tracking-[-.05em] font-semibold">Produza com estrutura.<br/><span className="text-white/35">Revise com controle.</span></h2></div>
-            <div className="max-w-sm"><p className="text-[13px] leading-6 text-white/45">Entre no ambiente de trabalho e transforme contexto jurídico em uma produção consistente, rastreável e pronta para revisão.</p><button onClick={()=>onNavigate('/login')} className="mt-7 inline-flex items-center gap-3 rounded-full bg-white px-6 py-3 text-[13px] font-semibold text-black hover:bg-cyan-100 transition">Acessar VIPAZ Jurídico <ArrowRight className="w-4 h-4"/></button></div>
-          </div>
-        </section>
-      </main>
-      <footer className="border-t border-white/[.07] px-6 py-8 text-[11px] text-white/30"><div className="mx-auto max-w-[1180px] flex justify-between"><span>VIPAZ Jurídico · Produção jurídica estruturada</span><span>© {new Date().getFullYear()}</span></div></footer>
-    </div>
-  );
+      <section className="bg-[#F3F3F0] px-6 py-24 lg:px-12 lg:py-32"><div className="mx-auto flex max-w-[1344px] flex-col gap-12 lg:flex-row lg:items-end lg:justify-between"><h2 className="max-w-4xl text-5xl font-medium leading-[.95] tracking-[-.055em] sm:text-7xl">Eleve padrão, qualidade e agilidade na entrega de artefatos jurídicos.</h2><div className="max-w-sm"><p className="text-sm leading-6 text-black/60">Comece com um caso e descubra como contexto, estratégia e entrega podem operar em um único sistema.</p><button onClick={()=>onNavigate('/login')} className="mt-7 inline-flex items-center gap-10 rounded-xl bg-black px-6 py-4 text-sm font-bold text-white hover:bg-[#20D7E8] hover:text-black">Acessar o VIPAZ <ArrowRight className="h-4 w-4"/></button></div></div></section>
+    </main>
+
+    <footer className="bg-black px-6 py-12 text-white lg:px-12"><div className="mx-auto flex max-w-[1344px] flex-col gap-8 sm:flex-row sm:items-end sm:justify-between"><div><VipazLogo inverse/><p className="mt-3 text-xs text-white/40">Produção jurídica de alta perfomance.</p></div><div className="text-[10px] text-white/35">© {new Date().getFullYear()} VIPAZ Jurídico · Ambiente profissional privado</div></div></footer>
+  </div>;
 };

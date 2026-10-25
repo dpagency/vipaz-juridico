@@ -30,7 +30,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   });
 
   return (
-    <div className="vipaz-app min-h-screen flex">
+    <div className="vipaz-app min-h-screen flex p-0 lg:p-3 lg:gap-3">
       <Sidebar
         currentPath={currentPath}
         onNavigate={onNavigate}
@@ -43,7 +43,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         isCollapsed={isCollapsed}
         onToggleCollapse={toggleCollapse}
       />
-      <div className="min-w-0 flex-1 flex flex-col">
+      <div className="min-w-0 flex-1 flex flex-col lg:rounded-[20px] lg:overflow-hidden lg:border vipaz-border-subtle bg-[var(--bg-app)]">
         <Topbar
           organization={organization}
           user={user}
@@ -51,7 +51,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           onToggleMobileMenu={() => setIsMobileOpen(v => !v)}
         />
         <main className="flex-1 w-full">
-          <div className="mx-auto w-full max-w-[1440px] px-5 py-6 sm:px-7 sm:py-8 lg:px-10 lg:py-10">
+          <div className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-7 sm:py-8 lg:px-8 lg:py-8">
             {children}
           </div>
         </main>

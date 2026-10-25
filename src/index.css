@@ -7,6 +7,11 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Geometria institucional: cantos discretos e consistentes. */
+:where(button, input, select, textarea, [class*="rounded-lg"], [class*="rounded-xl"], [class*="rounded-2xl"], [class*="rounded-[1"], [class*="rounded-[2"]):not([class*="rounded-full"]) {
+  border-radius: 5px !important;
+}
+
 
 /* =========================================================
    1. LIGHT MODE — DEFAULT
@@ -19,40 +24,40 @@
      Application
      ------------------------------------------------------- */
 
-  --bg-app: #F6F7F8;
+  --bg-app: #F2F4F3;
   --bg-surface: #FFFFFF;
   --bg-surface-elevated: #FFFFFF;
-  --bg-surface-subtle: #F1F3F5;
-  --bg-surface-muted: #ECEFF3;
+  --bg-surface-subtle: #E9ECEB;
+  --bg-surface-muted: #DDE2E0;
 
   /* -------------------------------------------------------
      Typography
      ------------------------------------------------------- */
 
-  --text-primary: #111827;
-  --text-secondary: #475467;
-  --text-muted: #667085;
-  --text-subtle: #98A2B3;
+  --text-primary: #11161A;
+  --text-secondary: #3F494F;
+  --text-muted: #657078;
+  --text-subtle: #8B959B;
   --text-inverse: #FFFFFF;
 
   /* -------------------------------------------------------
      Borders
      ------------------------------------------------------- */
 
-  --border-subtle: #EAECF0;
-  --border-default: #E4E7EC;
-  --border-strong: #D0D5DD;
+  --border-subtle: #D6DCDA;
+  --border-default: #C6CECB;
+  --border-strong: #AEB8B4;
 
   /* -------------------------------------------------------
      VIPAZ Brand
      ------------------------------------------------------- */
 
-  --primary-main: #087B9D;
-  --primary-hover: #066A8C;
-  --primary-active: #055873;
+  --primary-main: #111111;
+  --primary-hover: #272727;
+  --primary-active: #000000;
 
-  --primary-subtle: #EAF7FB;
-  --primary-muted: #D7EFF7;
+  --primary-subtle: #DDF9FC;
+  --primary-muted: #20D7E8;
 
   --primary-foreground: #FFFFFF;
 
@@ -96,11 +101,11 @@
      Radius
      ------------------------------------------------------- */
 
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
-  --radius-2xl: 24px;
+  --radius-sm: 5px;
+  --radius-md: 5px;
+  --radius-lg: 5px;
+  --radius-xl: 5px;
+  --radius-2xl: 5px;
 
   /* -------------------------------------------------------
      Focus
@@ -148,11 +153,11 @@
      Application
      ------------------------------------------------------- */
 
-  --bg-app: #090C11;
-  --bg-surface: #0E1319;
-  --bg-surface-elevated: #121820;
-  --bg-surface-subtle: #161D25;
-  --bg-surface-muted: #202A35;
+  --bg-app: #0B1020;
+  --bg-surface: #11172A;
+  --bg-surface-elevated: #161D33;
+  --bg-surface-subtle: #1A2238;
+  --bg-surface-muted: #25304A;
 
   /* -------------------------------------------------------
      Typography
@@ -176,9 +181,9 @@
      VIPAZ Brand
      ------------------------------------------------------- */
 
-  --primary-main: #6BC4DC;
-  --primary-hover: #6CC4DF;
-  --primary-active: #83CDE4;
+  --primary-main: #8BA8FF;
+  --primary-hover: #A5BAFF;
+  --primary-active: #C1CEFF;
 
   --primary-subtle: rgba(85, 183, 213, 0.10);
   --primary-muted: rgba(85, 183, 213, 0.16);
@@ -276,12 +281,13 @@
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
+    overflow-x: hidden;
 
     background: var(--bg-app);
     color: var(--text-primary);
 
     font-family:
-      'Plus Jakarta Sans',
+      'Manrope',
       Inter,
       system-ui,
       -apple-system,
@@ -343,10 +349,9 @@
 
 .font-editorial {
   font-family:
-    'Newsreader',
-    Georgia,
-    'Times New Roman',
-    serif;
+    'Manrope',
+    system-ui,
+    sans-serif;
 }
 
 .font-mono-tech {
@@ -722,9 +727,19 @@
 
 
 /* Quiet Legal Intelligence — presentation layer */
-.vipaz-page-title { font-size: clamp(1.65rem, 2.5vw, 2.25rem); line-height: 1.08; letter-spacing: -.035em; font-weight: 650; }
+.vipaz-page-title { font-family:'Manrope',system-ui,sans-serif; font-size: clamp(2.25rem, 4vw, 4rem); line-height: .98; letter-spacing: -.055em; font-weight: 500; }
 .vipaz-page-description { margin-top: .5rem; max-width: 42rem; color: var(--text-muted); font-size: .8125rem; line-height: 1.55; }
 .vipaz-section { border-top: 1px solid var(--border-subtle); padding-top: 1.5rem; }
+
+/* Bento foundation */
+.vipaz-bento { display:grid; gap:1rem; }
+.vipaz-bento > * { min-width:0; }
+.vipaz-bento-card { position:relative; overflow:hidden; border:1px solid var(--border-subtle); border-radius:5px; }
+.vipaz-bento-card::after { content:""; position:absolute; inset:0; pointer-events:none; border-top:1px solid rgba(255,255,255,.45); }
+.vipaz-grid-texture { background-image:linear-gradient(var(--border-subtle) 1px,transparent 1px),linear-gradient(90deg,var(--border-subtle) 1px,transparent 1px); background-size:28px 28px; }
+.vipaz-orb { display:none; }
+.vipaz-kicker { font-size:.65rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+.vipaz-display { font-family:'Manrope',system-ui,sans-serif; font-weight:500; letter-spacing:-.055em; }
 
 
 /* Production workspace — clean presentation without exposing implementation */
@@ -861,4 +876,15 @@
 :root:not(.dark) .vipaz-production input::placeholder,
 :root:not(.dark) .vipaz-production textarea::placeholder {
   color: var(--text-subtle);
+}
+
+@keyframes vipaz-flow-pulse {
+  0% { stroke-dashoffset: 0; opacity: .38; filter: drop-shadow(0 0 0 rgba(32,215,232,0)); }
+  45% { opacity: 1; filter: drop-shadow(0 0 5px rgba(32,215,232,.9)); }
+  100% { stroke-dashoffset: -24; opacity: .38; filter: drop-shadow(0 0 0 rgba(32,215,232,0)); }
+}
+.legal-flow-link { animation: vipaz-flow-pulse 3.8s linear infinite; }
+.legal-flow-link-secondary { animation-delay: -1.9s; animation-duration: 5.4s; }
+@media (prefers-reduced-motion: reduce) {
+  .legal-flow-link { animation: none; }
 }

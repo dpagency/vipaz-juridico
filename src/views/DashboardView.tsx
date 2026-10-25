@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, FilePlus2, Files, CheckCircle2, Clock3 } from 'lucide-react';
+import { ArrowRight, FilePlus2, Files, CheckCircle2, Clock3, Sparkles, Scale } from 'lucide-react';
 import { Organization, GenerationJob, GeneratedDocument } from '../types';
 import { generationService } from '../services/generationService';
 import { StatusBadge } from '../components/StatusBadge';
@@ -15,31 +15,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ organization, onNa
   const processing=jobs.filter(j=>j.status==='processing').length;
   const openDoc=async(id:string)=>{const doc=await generationService.getDocumentByJobId(id);if(doc)setSelectedDoc(doc);};
 
-  return <div className="space-y-10 animate-in fade-in duration-150">
-    <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-      <div><div className="vipaz-eyebrow mb-3">{organization.name}</div><h1 className="vipaz-page-title">Seu trabalho jurídico, organizado.</h1><p className="vipaz-page-description">Acompanhe casos recentes e inicie uma nova produção a partir do método validado da sua organização.</p></div>
-      <button onClick={()=>onNavigate(`/app/${organization.slug}/nova-peca`)} className="vipaz-button-primary shrink-0"><FilePlus2 className="w-4 h-4"/>Nova peça</button>
+  return <div className="space-y-6 animate-in fade-in duration-300">
+    <section className="vipaz-bento lg:grid-cols-12">
+      <article className="vipaz-bento-card min-h-[310px] bg-white p-7 sm:p-9 lg:col-span-8">
+        <div className="relative z-10 flex h-full flex-col justify-between">
+          <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[#20D7E8] ring-1 ring-black/20"/><span className="vipaz-kicker text-[#657078]">{organization.name}</span></div>
+          <div><h1 className="vipaz-display max-w-2xl text-5xl leading-[.94] sm:text-7xl"><span className="block">Seu trabalho,</span><span className="mt-2 block w-fit rounded-[5px] bg-[#20D7E8] px-2 pb-1">em perspectiva.</span></h1><p className="mt-5 max-w-lg text-xs leading-6 text-[#657078]">Acompanhe o que está em movimento e transforme contexto em uma nova produção estruturada.</p></div>
+        </div>
+      </article>
+      <article className="vipaz-bento-card min-h-[310px] bg-[#11161A] p-7 text-white sm:p-9 lg:col-span-4">
+        <div className="flex h-full flex-col justify-between"><div className="flex items-start justify-between"><span className="vipaz-kicker text-white/45">Ação principal</span><Sparkles className="h-5 w-5 text-[#20D7E8]"/></div><div><h2 className="vipaz-display text-4xl leading-none">Comece uma<br/>nova peça.</h2><button onClick={()=>onNavigate(`/app/${organization.slug}/nova-peca`)} className="mt-7 inline-flex items-center gap-3 rounded-xl bg-[#20D7E8] py-2 pl-5 pr-2 text-xs font-bold text-[#11161A]">Criar agora <span className="grid h-8 w-8 place-items-center rounded-lg bg-black text-white"><FilePlus2 className="h-4 w-4"/></span></button></div></div>
+      </article>
     </section>
 
-    <section className="grid sm:grid-cols-3 border-y vipaz-border-subtle">
-      {[[jobs.length,'Produções','Registros no workspace',Files],[processing,'Em andamento','Produções em processamento',Clock3],[completed,'Concluídas','Documentos disponíveis',CheckCircle2]].map(([value,label,desc,Icon],i)=>{
-        const I=Icon as React.ElementType; return <div key={label as string} className={`py-6 ${i?'sm:border-l sm:pl-7 vipaz-border-subtle':''}`}>
-          <div className="flex items-center gap-2 text-[11px] vipaz-text-muted"><I className="w-4 h-4"/>{label as string}</div><div className="mt-3 text-3xl tracking-[-.04em] font-semibold">{value as number}</div><div className="mt-1 text-[10px] vipaz-text-subtle">{desc as string}</div>
-        </div>;
-      })}
+    <section className="vipaz-bento sm:grid-cols-3">
+      {[[jobs.length,'Produções','Total no workspace',Files],[processing,'Em andamento','Exigem acompanhamento',Clock3],[completed,'Concluídas','Prontas para uso',CheckCircle2]].map(([value,label,desc,Icon],index)=>{const I=Icon as React.ElementType;return <article key={label as string} className="vipaz-bento-card min-h-[170px] bg-white p-6"><div className="flex h-full flex-col justify-between"><div className="flex items-center justify-between"><span className="vipaz-kicker text-[#657078]">{label as string}</span><I className={`h-4 w-4 ${index===1?'text-[#9A6A1F]':index===2?'text-[#4B8064]':'text-[#174E68]'}`}/></div><div><div className="font-mono text-5xl font-medium leading-none">{value as number}</div><p className="mt-2 text-[10px] font-semibold text-[#8B959B]">{desc as string}</p></div></div></article>;})}
     </section>
 
-    <section>
-      <div className="mb-5 flex items-end justify-between"><div><h2 className="text-[15px] font-semibold">Atividade recente</h2><p className="mt-1 text-[11px] vipaz-text-muted">Últimas produções registradas.</p></div><button onClick={()=>onNavigate(`/app/${organization.slug}/documentos`)} className="text-[11px] vipaz-text-muted hover:vipaz-text-brand flex items-center gap-1">Ver documentos <ArrowRight className="w-3 h-3"/></button></div>
-      {jobs.length===0 ? <div className="vipaz-card p-10 text-center"><p className="text-[12px] vipaz-text-muted">Nenhuma produção registrada.</p><button onClick={()=>onNavigate(`/app/${organization.slug}/nova-peca`)} className="mt-4 text-[12px] font-semibold vipaz-text-brand">Criar primeira peça</button></div> :
-      <div className="vipaz-card overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-[11px]">
-        <thead className="border-b vipaz-border-subtle vipaz-text-subtle"><tr><th className="px-5 py-3 font-medium">Processo</th><th className="px-5 py-3 font-medium">Peça</th><th className="px-5 py-3 font-medium">Parte representada</th><th className="px-5 py-3 font-medium">Status</th><th className="px-5 py-3"></th></tr></thead>
-        <tbody>{jobs.slice(0,6).map(job=><tr key={job.id} className="border-b last:border-0 vipaz-border-subtle hover:bg-[var(--bg-surface-subtle)] transition">
-          <td className="px-5 py-4"><div className="font-medium">{job.process_data?.process_number||job.process?.process_number||'—'}</div><div className="mt-1 text-[9px] vipaz-text-subtle">{job.process_data?.court||job.process?.court||''}</div></td>
-          <td className="px-5 py-4 font-medium">{job.document_type}</td><td className="px-5 py-4 vipaz-text-secondary">{job.process_data?.represented_party||job.process?.represented_party||'—'}</td><td className="px-5 py-4"><StatusBadge status={job.status}/></td>
-          <td className="px-5 py-4 text-right"><button onClick={()=>onNavigate(`/app/${organization.slug}/geracoes/${job.id}`)} className="vipaz-text-brand font-medium">Abrir</button>{job.status==='completed'&&<button onClick={()=>openDoc(job.id)} className="ml-4 vipaz-text-muted">Visualizar</button>}</td>
-        </tr>)}</tbody>
-      </table></div></div>}
+    <section className="vipaz-bento-card bg-[var(--bg-surface)] p-5 sm:p-7">
+      <div className="mb-6 flex items-end justify-between gap-4"><div><span className="vipaz-kicker vipaz-text-brand">Atividade recente</span><h2 className="mt-2 text-lg font-extrabold tracking-[-.03em]">Produções do workspace</h2></div><button onClick={()=>onNavigate(`/app/${organization.slug}/documentos`)} className="inline-flex items-center gap-2 text-[11px] font-bold vipaz-text-brand">Ver tudo <ArrowRight className="h-3.5 w-3.5"/></button></div>
+      {jobs.length===0 ? <div className="vipaz-grid-texture rounded-[20px] border vipaz-border-subtle py-16 text-center"><Scale className="mx-auto h-6 w-6 vipaz-text-subtle"/><p className="mt-4 text-xs vipaz-text-muted">Nenhuma produção registrada.</p><button onClick={()=>onNavigate(`/app/${organization.slug}/nova-peca`)} className="mt-4 text-xs font-bold vipaz-text-brand">Criar primeira peça</button></div> :
+      <div className="overflow-x-auto rounded-[18px] border vipaz-border-subtle"><table className="w-full text-left text-[11px]"><thead className="bg-[var(--bg-surface-subtle)] vipaz-text-subtle"><tr><th className="px-5 py-3 font-semibold">Processo</th><th className="px-5 py-3 font-semibold">Peça</th><th className="px-5 py-3 font-semibold">Parte</th><th className="px-5 py-3 font-semibold">Status</th><th className="px-5 py-3"/></tr></thead><tbody>{jobs.slice(0,6).map(job=><tr key={job.id} className="border-t vipaz-border-subtle hover:bg-[var(--bg-surface-subtle)]"><td className="px-5 py-4"><div className="font-bold">{job.process_data?.process_number||job.process?.process_number||'—'}</div><div className="mt-1 text-[9px] vipaz-text-subtle">{job.process_data?.court||job.process?.court||''}</div></td><td className="px-5 py-4 font-semibold">{job.document_type}</td><td className="px-5 py-4 vipaz-text-secondary">{job.process_data?.represented_party||job.process?.represented_party||'—'}</td><td className="px-5 py-4"><StatusBadge status={job.status}/></td><td className="px-5 py-4 text-right"><button onClick={()=>onNavigate(`/app/${organization.slug}/geracoes/${job.id}`)} className="font-bold vipaz-text-brand">Abrir</button>{job.status==='completed'&&<button onClick={()=>openDoc(job.id)} className="ml-4 vipaz-text-muted">Visualizar</button>}</td></tr>)}</tbody></table></div>}
     </section>
     {selectedDoc&&<DocumentViewerModal document={selectedDoc} onClose={()=>setSelectedDoc(null)}/>}
   </div>;

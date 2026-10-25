@@ -74,7 +74,19 @@ function AppContent() {
   // The legal workspace is mounted at /juridico on the institutional domain.
   // The root remains a separate institutional entry point.
   if (isVipazDomain && (window.location.pathname === '/' || window.location.pathname === '/index.html')) {
-    return <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-8 text-center"><h1 className="text-5xl font-bold">VIPAZ</h1><a className="mt-8 rounded-lg bg-cyan-600 px-6 py-3" href="/juridico">Acessar VIPAZ Jurídico</a></main>;
+    const portals = [
+      { name:'VIPAZ Jurídico', detail:'Produção jurídica estruturada', href:'/juridico', active:true },
+      { name:'VIPAZ LGPD', detail:'Governança e proteção de dados', href:'/lgpd', active:false },
+      { name:'VIPAZ Saúde', detail:'Inteligência para a saúde', href:'/saude', active:false },
+      { name:'VIPAZ Games', detail:'Experiências e jogos digitais', href:'/games', active:false },
+    ];
+    return <main className="min-h-screen bg-[#020817] text-white flex flex-col items-center justify-center p-6 text-center">
+      <img src="/assets/vipaz-orbit-logo.png" alt="VIPAZ" className="h-32 w-48 object-contain invert sm:h-40 sm:w-60"/>
+      <p className="mt-3 text-[10px] font-bold uppercase tracking-[.28em] text-white/40">Escolha seu ambiente</p>
+      <div className="mt-12 grid w-full max-w-5xl gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {portals.map(portal=>portal.active?<a key={portal.name} href={portal.href} className="group rounded-[5px] border border-[#20D7E8]/50 bg-[#20D7E8]/10 p-5 text-left transition hover:-translate-y-1 hover:border-[#20D7E8] hover:bg-[#20D7E8] hover:text-[#020817]"><span className="text-sm font-bold">{portal.name}</span><span className="mt-6 block text-[10px] leading-4 text-white/45 group-hover:text-[#020817]/65">{portal.detail}</span><ArrowRight className="mt-5 h-4 w-4"/></a>:<div key={portal.name} className="rounded-[5px] border border-white/10 bg-white/[.03] p-5 text-left text-white/40"><span className="text-sm font-bold">{portal.name}</span><span className="mt-6 block text-[10px] leading-4">{portal.detail}</span><span className="mt-5 block font-mono text-[9px] uppercase tracking-wider text-[#20D7E8]/60">Em breve</span></div>)}
+      </div>
+    </main>;
   }
 
   // Initial Auth Loading Screen
