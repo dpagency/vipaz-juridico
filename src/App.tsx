@@ -352,7 +352,7 @@ function AppContent() {
       return (
         <AppShell currentPath={currentPath} onNavigate={navigate} organization={currentOrg}
           user={session.user} onLogout={handleLogout} onSwitchTenant={handleSwitchTenant}>
-          <StudioView />
+          <StudioView organization={currentOrg} />
         </AppShell>
       );
     }

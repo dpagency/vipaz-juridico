@@ -14,6 +14,7 @@ import { HOMOLOGATED_CASE_DEFAULTS } from '../domain/legal-engine/formDefinition
 import { ruleEngine } from '../domain/legal-engine/ruleEngine';
 import { buildCawDocxPayload } from '../domain/legal-engine/documentPayloadMapper';
 import { LegalBlock } from '../domain/legal-engine/types';
+import { WorkspacePage, WorkspacePageHeader } from '../components/WorkspacePage';
 
 interface AdminToolsViewProps {
   organization: Organization;
@@ -43,27 +44,18 @@ export const AdminToolsView: React.FC<AdminToolsViewProps> = ({
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
-        <div>
-          <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400 text-xs font-semibold uppercase tracking-wider mb-1">
-            <Wrench className="w-3.5 h-3.5" />
-            <span>MÓDULO TÉCNICO & AUDITORIA INTERNA</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Administração & Engenharia Forense
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Inspeção da BlockLibrary determinística, RuleEngine, serializador documental e diagnósticos de infraestrutura.
-          </p>
-        </div>
-
+    <WorkspacePage className="!space-y-6">
+      <WorkspacePageHeader
+        eyebrow={`${organization.name} · Módulo técnico`}
+        title="Administração"
+        description="Inspeção da BlockLibrary determinística, RuleEngine, serializador documental e diagnósticos de infraestrutura."
+        actions={
         <div className="px-3 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-mono-tech flex items-center gap-1.5 self-start sm:self-center">
           <ShieldCheck className="w-3.5 h-3.5" />
           <span>Motor Determinístico v2.0 (173 Testes Aprovados)</span>
         </div>
-      </div>
+        }
+      />
 
       {/* Tabs Técnicas */}
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
@@ -194,6 +186,6 @@ export const AdminToolsView: React.FC<AdminToolsViewProps> = ({
           </pre>
         </div>
       )}
-    </div>
+    </WorkspacePage>
   );
 };

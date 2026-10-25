@@ -4,6 +4,7 @@ import { Organization, GenerationJob, GeneratedDocument } from '../types';
 import { generationService } from '../services/generationService';
 import { StatusBadge } from '../components/StatusBadge';
 import { DocumentViewerModal } from '../components/DocumentViewerModal';
+import { WorkspacePage } from '../components/WorkspacePage';
 
 interface DashboardViewProps { organization: Organization; onNavigate: (path: string) => void; }
 
@@ -15,7 +16,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ organization, onNa
   const processing=jobs.filter(j=>j.status==='processing').length;
   const openDoc=async(id:string)=>{const doc=await generationService.getDocumentByJobId(id);if(doc)setSelectedDoc(doc);};
 
-  return <div className="space-y-6 animate-in fade-in duration-300">
+  return <WorkspacePage className="!space-y-6">
     <section className="vipaz-bento lg:grid-cols-12">
       <article className="vipaz-bento-card min-h-[310px] bg-white p-7 sm:p-9 lg:col-span-8">
         <div className="relative z-10 flex h-full flex-col justify-between">
@@ -38,5 +39,5 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ organization, onNa
       <div className="overflow-x-auto rounded-[18px] border vipaz-border-subtle"><table className="w-full text-left text-[11px]"><thead className="bg-[var(--bg-surface-subtle)] vipaz-text-subtle"><tr><th className="px-5 py-3 font-semibold">Processo</th><th className="px-5 py-3 font-semibold">Peça</th><th className="px-5 py-3 font-semibold">Parte</th><th className="px-5 py-3 font-semibold">Status</th><th className="px-5 py-3"/></tr></thead><tbody>{jobs.slice(0,6).map(job=><tr key={job.id} className="border-t vipaz-border-subtle hover:bg-[var(--bg-surface-subtle)]"><td className="px-5 py-4"><div className="font-bold">{job.process_data?.process_number||job.process?.process_number||'—'}</div><div className="mt-1 text-[9px] vipaz-text-subtle">{job.process_data?.court||job.process?.court||''}</div></td><td className="px-5 py-4 font-semibold">{job.document_type}</td><td className="px-5 py-4 vipaz-text-secondary">{job.process_data?.represented_party||job.process?.represented_party||'—'}</td><td className="px-5 py-4"><StatusBadge status={job.status}/></td><td className="px-5 py-4 text-right"><button onClick={()=>onNavigate(`/app/${organization.slug}/geracoes/${job.id}`)} className="font-bold vipaz-text-brand">Abrir</button>{job.status==='completed'&&<button onClick={()=>openDoc(job.id)} className="ml-4 vipaz-text-muted">Visualizar</button>}</td></tr>)}</tbody></table></div>}
     </section>
     {selectedDoc&&<DocumentViewerModal document={selectedDoc} onClose={()=>setSelectedDoc(null)}/>}
-  </div>;
+  </WorkspacePage>;
 };

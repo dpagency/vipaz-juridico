@@ -56,6 +56,7 @@ import {
 } from '../domain/legal-engine/formDefinitions';
 import { isPieceHomologated } from '../domain/legal-engine/architectureRegistry';
 import { legalAiService, LegalAiField } from '../services/legalAiService';
+import { WorkspacePage, WorkspacePageHeader } from '../components/WorkspacePage';
 
 interface NovaPecaViewProps {
   organization: Organization;
@@ -425,18 +426,12 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
   };
 
   return (
-    <div className="vipaz-production max-w-5xl mx-auto space-y-8 animate-in fade-in duration-200">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
-        <div>
-          <div className="vipaz-eyebrow mb-2">{organization.name}</div>
-          <h1 className="vipaz-page-title">Nova peça</h1>
-          <p className="vipaz-page-description">Informe os dados do caso, defina as questões jurídicas aplicáveis e revise a estrutura antes de produzir o documento.</p>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="flex flex-wrap items-center gap-3">
-
+    <WorkspacePage className="vipaz-production">
+      <WorkspacePageHeader
+        eyebrow={organization.name}
+        title="Delivery"
+        description="Informe os dados do caso, defina as questões jurídicas aplicáveis e revise a estrutura antes de produzir o documento."
+        actions={<>
           <button
             type="button"
             onClick={handleQuickFill}
@@ -455,8 +450,8 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
             <Layers className="w-3.5 h-3.5 text-cyan-400" />
             <span>Revisar estrutura ({activeBlocksCount})</span>
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* Confirmação Discreta de Snapshot Persistido (Fase 3) */}
       {persistedSnapshot && (
@@ -1663,6 +1658,6 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
         }}
         isGenerating={isSubmitting}
       />
-    </div>
+    </WorkspacePage>
   );
 };

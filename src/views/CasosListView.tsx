@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Organization } from '../types';
 import { HOMOLOGATED_CASE_WORKSPACE } from '../services/caseWorkspaceService';
+import { WorkspacePage, WorkspacePageHeader } from '../components/WorkspacePage';
 
 interface CasosListViewProps {
   organization: Organization;
@@ -42,23 +43,21 @@ export const CasosListView: React.FC<CasosListViewProps> = ({
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
-        <div>
-          <div className="vipaz-eyebrow mb-2">{organization.name}</div>
-          <h1 className="vipaz-page-title">Casos</h1>
-          <p className="vipaz-page-description">Organize processos, contexto e documentos em um único workspace.</p>
-        </div>
-
+    <WorkspacePage>
+      <WorkspacePageHeader
+        eyebrow={organization.name}
+        title="Matters"
+        description="Organize processos, contexto e documentos em um único workspace."
+        actions={
         <button
           onClick={() => onNavigate(`/app/${organization.slug}/nova-peca`)}
-          className="vipaz-button-primary self-start sm:self-center"
+          className="vipaz-button-primary"
         >
           <Plus className="w-4 h-4" />
           <span>Novo caso</span>
         </button>
-      </div>
+        }
+      />
 
       {/* Barra de Filtro e Busca */}
       <div className="p-4 rounded-xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -153,6 +152,6 @@ export const CasosListView: React.FC<CasosListViewProps> = ({
           </div>
         ))}
       </div>
-    </div>
+    </WorkspacePage>
   );
 };

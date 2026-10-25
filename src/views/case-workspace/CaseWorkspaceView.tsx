@@ -25,6 +25,7 @@ import { CaseStrategyTab } from './CaseStrategyTab';
 import { CasePiecesTab } from './CasePiecesTab';
 import { CaseHistoryTab } from './CaseHistoryTab';
 import { SourceEvidenceModal } from '../../components/SourceEvidenceModal';
+import { WorkspacePage } from '../../components/WorkspacePage';
 
 interface CaseWorkspaceViewProps {
   caseId?: string;
@@ -84,7 +85,7 @@ export const CaseWorkspaceView: React.FC<CaseWorkspaceViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
+    <WorkspacePage className="!space-y-6">
       {/* Breadcrumb e Cabeçalho do Caso */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -204,6 +205,6 @@ export const CaseWorkspaceView: React.FC<CaseWorkspaceViewProps> = ({
           onClose={() => setEvidenceModalData(null)}
         />
       )}
-    </div>
+    </WorkspacePage>
   );
 };

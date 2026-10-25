@@ -16,6 +16,7 @@ import {
 import { GenerationJob, GeneratedDocument, Organization } from '../types';
 import { generationService } from '../services/generationService';
 import { GenerationTimeline } from '../components/GenerationTimeline';
+import { WorkspacePage } from '../components/WorkspacePage';
 
 interface GeracaoViewProps {
   jobId: string;
@@ -239,7 +240,7 @@ export const GeracaoView: React.FC<GeracaoViewProps> = ({
     : Math.round((completedSteps / totalSteps) * 100);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-200">
+    <WorkspacePage>
       {/* Top Breadcrumb & Refresh */}
       <div className="flex items-center justify-between">
         <button
@@ -623,6 +624,6 @@ export const GeracaoView: React.FC<GeracaoViewProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </WorkspacePage>
   );
 };
