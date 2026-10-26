@@ -3,7 +3,7 @@
  * Motor Determinístico de Montagem Jurídica (Contestação Reajuste PME)
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Building2,
   ArrowRight,
@@ -27,7 +27,7 @@ import {
   Workflow,
   HardDrive,
 } from 'lucide-react';
-import { Organization, DocumentType } from '../types';
+import { Organization, DocumentType, type DocumentTemplate } from '../types';
 import {
   LegalFormData,
   UfType,
@@ -57,6 +57,7 @@ import {
 import { isPieceHomologated } from '../domain/legal-engine/architectureRegistry';
 import { legalAiService, LegalAiField } from '../services/legalAiService';
 import { WorkspacePage, WorkspacePageHeader } from '../components/WorkspacePage';
+import { legalProductionService } from '../services/legalProductionService';
 
 interface NovaPecaViewProps {
   organization: Organization;
@@ -119,6 +120,21 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [generatingAiField, setGeneratingAiField] = useState<LegalAiField | null>(null);
   const [aiFieldError, setAiFieldError] = useState<string | null>(null);
+  const [approvedTemplates, setApprovedTemplates] = useState<DocumentTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [templateMessage, setTemplateMessage] = useState('Carregando modelos homologados…');
+
+  useEffect(() => {
+    let active = true;
+    legalProductionService.listTemplates(organization.id).then(rows => {
+      if (!active) return;
+      const approved = rows.filter(row => row.status === 'approved');
+      setApprovedTemplates(approved);
+      setSelectedTemplateId(current => current && approved.some(row => row.id === current) ? current : (approved[0]?.id || ''));
+      setTemplateMessage(approved.length ? '' : 'Nenhum modelo homologado. Envie um DOCX pelo Studio e homologue-o na Library.');
+    }).catch(error => { if (active) setTemplateMessage(error instanceof Error ? error.message : 'Falha ao carregar modelos.'); });
+    return () => { active = false; };
+  }, [organization.id]);
 
   // Estados da Fase 4: Geração Experimental do DOCX Determinístico
   const [isGeneratingDocx, setIsGeneratingDocx] = useState(false);
@@ -131,6 +147,18 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
   const [cawDocxStepMessage, setCawDocxStepMessage] = useState<string>('');
   const [cawDocxResult, setCawDocxResult] = useState<CawDocxGenerationResult | null>(null);
   const [cawDocxError, setCawDocxError] = useState<string | null>(null);
+  const [reviewMessage, setReviewMessage] = useState('');
+  const [reviewBusy, setReviewBusy] = useState(false);
+
+  async function updateReview(status: 'awaiting_review' | 'changes_requested' | 'approved') {
+    if (!cawDocxResult?.document_id) { setReviewMessage('O motor não retornou o identificador do documento.'); return; }
+    setReviewBusy(true);
+    try {
+      await legalProductionService.reviewDocument({ organizationId: organization.id, documentId: cawDocxResult.document_id, jobId: cawDocxResult.job_id, status });
+      setReviewMessage(status === 'awaiting_review' ? 'Documento enviado para revisão humana.' : status === 'approved' ? 'Documento aprovado e registrado na trilha de auditoria.' : 'Ajustes solicitados e registrados.');
+    } catch (error) { setReviewMessage(error instanceof Error ? error.message : 'Não foi possível atualizar a revisão.'); }
+    finally { setReviewBusy(false); }
+  }
 
   const isAgravo = formData.document_piece === 'Agravo de Instrumento';
   const countersecurityAllowed = Boolean(
@@ -379,6 +407,8 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+    const selectedTemplate = approvedTemplates.find(template => template.id === selectedTemplateId);
+    if (!selectedTemplate) { setClientErrors({ submit: 'Selecione um modelo homologado antes de produzir a peça.' }); return; }
 
     // Validação formal
     const check = ruleEngine.evaluate(formData);
@@ -406,6 +436,8 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
           setProgressStatus(statusText);
         }
       );
+
+      await legalProductionService.bindGeneration(result.generation_job_id, selectedTemplate);
 
       setPersistedSnapshot({
         generation_job_id: result.generation_job_id,
@@ -654,6 +686,11 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
                     </button>
                   </div>
                 </div>
+                {cawDocxResult.document_id && <div className="border-t border-slate-700 pt-3">
+                  <p className="mb-2 text-[11px] text-slate-400">Revisão humana obrigatória</p>
+                  <div className="flex flex-wrap gap-2"><button type="button" disabled={reviewBusy} onClick={() => void updateReview('awaiting_review')} className="rounded-[5px] border border-cyan-500 px-3 py-2 text-xs text-cyan-300 disabled:opacity-50">Enviar para revisão</button><button type="button" disabled={reviewBusy} onClick={() => void updateReview('changes_requested')} className="rounded-[5px] border border-amber-500 px-3 py-2 text-xs text-amber-300 disabled:opacity-50">Solicitar ajustes</button><button type="button" disabled={reviewBusy} onClick={() => void updateReview('approved')} className="rounded-[5px] border border-emerald-500 px-3 py-2 text-xs text-emerald-300 disabled:opacity-50">Aprovar documento</button></div>
+                  {reviewMessage && <p role="status" className="mt-2 text-xs text-slate-300">{reviewMessage}</p>}
+                </div>}
               </div>
             )}
           </div>
@@ -661,6 +698,15 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
       )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        <section className="vipaz-card rounded-[5px] p-5">
+          <label className="text-xs font-semibold uppercase tracking-wider vipaz-text-primary">Modelo homologado
+            <select required className="mt-3 block w-full rounded-[5px] border vipaz-border-subtle bg-transparent p-3 text-sm" value={selectedTemplateId} onChange={event => setSelectedTemplateId(event.target.value)}>
+              <option value="">Selecione a versão aprovada</option>
+              {approvedTemplates.filter(template => template.document_type === formData.document_piece || template.document_type === 'Outros').map(template => <option key={template.id} value={template.id}>{template.name} · v{template.version}</option>)}
+            </select>
+          </label>
+          {templateMessage && <p role="status" className="mt-3 text-xs text-amber-400">{templateMessage}</p>}
+        </section>
         {/* SEÇÃO 01: TIPO DE PEÇA PROCESSUAL */}
         <div className="p-6 rounded-2xl vipaz-card space-y-4">
           <div className="flex items-center justify-between border-b vipaz-border-subtle pb-3">

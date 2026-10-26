@@ -4,8 +4,10 @@ import type { StudioMarker, StudioParagraph } from '../services/studioTemplateEn
 type FieldType = 'text' | 'checkbox' | 'select' | 'condition' | 'ai' | 'repeat';
 type Mode = 'required' | 'direct' | 'conditional' | 'combined';
 type Condition = { path: string; equals: string };
-type Binding = { id: string; type: FieldType; label: string; path: string; paragraphIndex: number; instructions: string; options: string[]; mode?: Mode; conditions?: Condition[]; operator?: 'AND' | 'OR'; range?: { start: number; end: number }; endParagraphIndex?: number };
-type Saved = { schemaVersion: 2; template: string; bindings: Binding[] };
+export type StudioBinding = { id: string; type: FieldType; label: string; path: string; paragraphIndex: number; instructions: string; options: string[]; mode?: Mode; conditions?: Condition[]; operator?: 'AND' | 'OR'; range?: { start: number; end: number }; endParagraphIndex?: number };
+export type StudioCompositionMap = { schemaVersion: 2; template: string; bindings: StudioBinding[] };
+type Binding = StudioBinding;
+type Saved = StudioCompositionMap;
 const modes: Record<Mode, { label: string; color: string }> = {
   required: { label: 'Inclusão Obrigatória', color: 'border-slate-400 bg-slate-100 text-slate-800' },
   direct: { label: 'Preenchimento Direto', color: 'border-sky-400 bg-sky-100 text-sky-900' },
@@ -39,7 +41,7 @@ const download = (name: string, content: string) => {
   const a = document.createElement('a'); a.href = url; a.download = name; a.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
-export function StudioVisualEditor({ filename, paragraphs, markers }: { filename: string; paragraphs: StudioParagraph[]; markers: StudioMarker[] }) {
+export function StudioVisualEditor({ filename, paragraphs, markers, onSave }: { filename: string; paragraphs: StudioParagraph[]; markers: StudioMarker[]; onSave?: (map: StudioCompositionMap, submit: boolean) => Promise<void> }) {
   const storageKey = 'vipaz-studio-visual-v2:' + filename;
   const [bindings, setBindings] = useState<Binding[]>([]);
   const [active, setActive] = useState<string | null>(null);
@@ -52,6 +54,7 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
   const [modalOpen, setModalOpen] = useState(false);
   const [explainedMode, setExplainedMode] = useState<Mode | null>(null);
   const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(storageKey);
@@ -121,10 +124,16 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
   };
   const update = (patch: Partial<Binding>) => setBindings(old => old.map(b => b.id === active ? { ...b, ...patch } : b));
   const validLocation = (b: Binding) => paragraphs.some(p => p.index === b.paragraphIndex && (!b.range || (Number.isInteger(b.range.start) && Number.isInteger(b.range.end) && b.range.start >= 0 && b.range.end > b.range.start && b.range.end <= p.text.length)) && (b.endParagraphIndex === undefined || (Number.isInteger(b.endParagraphIndex) && b.endParagraphIndex > b.paragraphIndex && paragraphs.some(q => q.index === b.endParagraphIndex))));
-  const save = () => {
+  const save = async (submit = false) => {
     if (bindings.some(b => !safePath(b.path) || (['conditional','combined'].includes(b.mode || '') && ((b.conditions || []).length < (b.mode === 'combined' ? 2 : 1) || (b.conditions || []).some(c => !safePath(c.path) || !c.equals.trim()))))) { setMessage('Corrija os caminhos de dados antes de salvar.'); return; }
-    try { window.localStorage.setItem(storageKey, JSON.stringify({ schemaVersion: 2, template: filename, bindings } satisfies Saved)); setMessage('Rascunho salvo neste navegador.'); }
+    const map = { schemaVersion: 2, template: filename, bindings } satisfies Saved;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(map));
+      if (onSave) { setSaving(true); await onSave(map, submit); setMessage(submit ? 'Modelo enviado para homologação na Library.' : 'Rascunho versionado salvo no workspace.'); }
+      else setMessage('Rascunho salvo neste navegador.');
+    }
     catch { setMessage('Não foi possível salvar no navegador. Exporte o JSON.'); }
+    finally { setSaving(false); }
   };
   const exportJson = () => download(filename.replace(/\.docx$/i, '') + '-mapa-visual.json', JSON.stringify({ schemaVersion: 2, template: filename, bindings } satisfies Saved, null, 2));
   const importJson = async (file?: File) => {
@@ -146,7 +155,8 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div><h2 className="font-bold text-xl">Editor visual de composição</h2><p className="text-xs opacity-70">Clique em um bloco ou selecione palavras dentro dele para configurar suas propriedades.</p></div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={save} className="rounded border px-3 py-2 text-sm">Salvar rascunho</button>
+        <button type="button" disabled={saving} onClick={() => void save(false)} className="rounded-[5px] border px-3 py-2 text-sm disabled:opacity-50">{saving ? 'Salvando…' : 'Salvar rascunho'}</button>
+        {onSave && <button type="button" disabled={saving} onClick={() => void save(true)} className="rounded-[5px] border border-cyan-700 px-3 py-2 text-sm text-cyan-700 disabled:opacity-50">Enviar para homologação</button>}
         <button type="button" onClick={exportJson} className="rounded bg-cyan-700 px-3 py-2 text-sm text-white">Exportar mapa</button>
         <label className="rounded border px-3 py-2 text-sm cursor-pointer">Importar mapa<input className="sr-only" type="file" accept=".json" onChange={e => void importJson(e.target.files?.[0])} /></label>
       </div>
@@ -217,6 +227,6 @@ export function StudioVisualEditor({ filename, paragraphs, markers }: { filename
     </div>}
     </div></div>}
     {message && <p role="status" className="text-sm">{message}</p>}
-    <p className="text-xs opacity-60">Os trechos internos são mapeados por posições no texto importado; a aplicação dessas regras ao DOCX original e a geração no Delivery ainda não estão implementadas. A visualização é textual e não substitui a paginação do Word. Os vínculos são armazenados como mapa de composição; a inserção de novos marcadores no DOCX, a persistência no Supabase e a geração pelo Delivery exigem etapas próprias.</p>
+    <p className="text-xs opacity-60">Os trechos internos são mapeados por posições no texto importado. O DOCX original e seu mapa de composição são versionados no workspace; a peça só fica disponível no Delivery após homologação na Library.</p>
   </section>;
 }

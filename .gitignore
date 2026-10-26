@@ -10,3 +10,4 @@ thread-chatgpt.md
 .env*
 !.env.example
 .vercel
+supabase/.temp/

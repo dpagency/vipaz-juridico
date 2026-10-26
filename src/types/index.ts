@@ -61,9 +61,18 @@ export interface DocumentTemplate {
   document_type: DocumentType;
   name: string;
   version: string;
-  status: 'active' | 'draft' | 'archived';
+  status: 'draft' | 'in_review' | 'approved' | 'deprecated' | 'archived';
   storage_path: string;
   rules_json?: Record<string, unknown>;
+  original_filename?: string;
+  mime_type?: string;
+  composition_map?: { schemaVersion: number; bindings: unknown[] };
+  schema_version?: number;
+  checksum?: string;
+  change_notes?: string;
+  created_by?: string;
+  approved_by?: string;
+  approved_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -148,6 +157,12 @@ export interface GeneratedDocument {
   pdf_storage_path?: string | null;
   created_at: string;
   updated_at?: string;
+  template_id?: string | null;
+  template_version?: string | null;
+  review_status?: 'draft' | 'awaiting_review' | 'changes_requested' | 'approved' | 'rejected';
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_notes?: string | null;
   title: string;
   metadata: {
     court: string;

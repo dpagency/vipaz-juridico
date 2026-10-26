@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { FilePenLine, FileUp, Upload } from 'lucide-react';
-import { StudioVisualEditor } from '../components/StudioVisualEditor';
+import { StudioVisualEditor, type StudioCompositionMap } from '../components/StudioVisualEditor';
 import { inspectStudioStructure, type StudioParagraph, type StudioMarker } from '../services/studioTemplateEngine';
-import type { Organization } from '../types';
+import type { DocumentType, Organization } from '../types';
+import { legalProductionService } from '../services/legalProductionService';
 import { WorkspacePage, WorkspacePageHeader } from '../components/WorkspacePage';
 
 export function StudioView({ organization }: { organization: Organization }) {
@@ -13,6 +14,9 @@ export function StudioView({ organization }: { organization: Organization }) {
   const [tableCount, setTableCount] = useState(0);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [version, setVersion] = useState('1.0');
+  const [documentType, setDocumentType] = useState<DocumentType>('Contestação');
 
   async function openTemplate(selected: File | undefined) {
     if (!selected) return;
@@ -21,11 +25,19 @@ export function StudioView({ organization }: { organization: Organization }) {
     try {
       const inspection = await inspectStudioStructure(selected);
       setMarkers(inspection.markers); setParagraphs(inspection.paragraphs); setTableCount(inspection.tables); setFile(selected);
+      setTemplateName(selected.name.replace(/\.docx$/i, ''));
       setStatus('Documento carregado. Clique em um bloco para configurar suas propriedades.');
     } catch (error) {
       setFile(null); setMarkers([]); setParagraphs([]); setTableCount(0);
       setStatus(error instanceof Error ? error.message : 'Falha ao importar DOCX');
     } finally { setBusy(false); }
+  }
+
+  async function persistTemplate(map: StudioCompositionMap, submit: boolean) {
+    if (!file || !templateName.trim() || !version.trim()) throw new Error('Informe nome e versão do modelo.');
+    setStatus(submit ? 'Enviando modelo para homologação…' : 'Salvando versão do modelo…');
+    const saved = await legalProductionService.saveTemplate({ organizationId: organization.id, file, name: templateName, version, documentType, map, submit });
+    setStatus(`${saved.name} v${saved.version} ${submit ? 'enviado para homologação' : 'salvo como rascunho'}.`);
   }
 
   return <WorkspacePage className="text-slate-800 dark:text-slate-100">
@@ -57,8 +69,12 @@ export function StudioView({ organization }: { organization: Organization }) {
       <div><h2 className="font-semibold">Modelo DOCX</h2><p className="text-sm opacity-70 break-all">{file.name} · {paragraphs.length} parágrafos · {tableCount} tabelas</p></div>
       <label className="cursor-pointer rounded-lg border px-4 py-2 text-sm">Trocar documento<input className="sr-only" type="file" accept=".docx" onChange={event => { void openTemplate(event.target.files?.[0]); event.target.value = ''; }}/></label>
     </section>}
-    {file && <StudioVisualEditor key={"visual-" + file.name + file.size + file.lastModified} filename={file.name} markers={markers} paragraphs={paragraphs} />}
+    {file && <section className="grid gap-3 rounded-[5px] border p-4 sm:grid-cols-3">
+      <label className="text-sm">Nome do modelo<input required className="mt-1 block w-full rounded-[5px] border bg-transparent p-2" value={templateName} onChange={e => setTemplateName(e.target.value)} /></label>
+      <label className="text-sm">Versão<input required className="mt-1 block w-full rounded-[5px] border bg-transparent p-2" value={version} onChange={e => setVersion(e.target.value)} /></label>
+      <label className="text-sm">Tipo de peça<select className="mt-1 block w-full rounded-[5px] border bg-transparent p-2" value={documentType} onChange={e => setDocumentType(e.target.value as DocumentType)}><option>Contestação</option><option>Recurso Inominado</option><option>Apelação</option><option>Agravo de Instrumento</option><option>Contraminuta de Agravo</option><option>Contrarrazões</option><option>Petição Intermediária</option><option>Outros</option></select></label>
+    </section>}
+    {file && <StudioVisualEditor key={"visual-" + file.name + file.size + file.lastModified} filename={file.name} markers={markers} paragraphs={paragraphs} onSave={persistTemplate} />}
     {status && <p role="status" className="rounded-lg border p-3 text-sm whitespace-pre-wrap">{status}</p>}
-    {file && <p className="text-xs opacity-60">Editor visual em desenvolvimento. A configuração ainda não gera automaticamente peças no Delivery.</p>}
   </WorkspacePage>;
 }
