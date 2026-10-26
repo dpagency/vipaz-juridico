@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { applyLegalIntakeSuggestions, type LegalIntakeSuggestion } from '../legalIntake';
 import { HOMOLOGATED_CASE_DEFAULTS } from '../formDefinitions';
+import { AGRAVO_DRAFT_FIELDS, FACTUAL_INTAKE_FIELDS, isAgravoDraftField, isFactualIntakeField } from '../legalProductionStages';
 
 const suggestions:LegalIntakeSuggestion[]=[
   {field:'process_number',status:'suggested',value:'4009025-83.2026.8.26.0704',confidence:'high',evidence:'Processo nº 4009025-83.2026.8.26.0704',page:1,explanation:'Capa'},
@@ -18,4 +19,10 @@ assert.equal(result.data.client,HOMOLOGATED_CASE_DEFAULTS.client);
 assert.deepEqual(result.appliedFields,['process_number','adverse_party_nature','dispute_objects']);
 const manual=applyLegalIntakeSuggestions(result.data,[{...suggestions[4],status:'suggested',value:'Parte preenchida manualmente'}],['client']);
 assert.equal(manual.data.client,'Parte preenchida manualmente');
-console.log('VIPAZ legal intake: controlled application contract passed');
+assert.equal(isFactualIntakeField('process_number'),true);
+assert.equal(isFactualIntakeField('appealed_decision'),true);
+assert.equal(isFactualIntakeField('appeal_fumus'),false);
+assert.equal(isAgravoDraftField('appeal_fumus'),true);
+assert.equal(isAgravoDraftField('process_number'),false);
+assert.equal(FACTUAL_INTAKE_FIELDS.some(field=>AGRAVO_DRAFT_FIELDS.includes(field as never)),false);
+console.log('VIPAZ legal intake: controlled application and staged production contracts passed');

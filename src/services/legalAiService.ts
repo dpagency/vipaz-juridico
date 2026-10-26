@@ -2,13 +2,22 @@ import * as tus from 'tus-js-client';
 import { supabase } from '../lib/supabase';
 import { normalizeAgravoFields } from '../domain/legal-engine/agravoQuality';
 import type { LegalIntakeSuggestion } from '../domain/legal-engine/legalIntake';
+import { AGRAVO_DRAFT_LABELS } from '../domain/legal-engine/legalProductionStages';
 
 export type LegalAiField =
  | 'appealed_decision' | 'executive_summary' | 'claim_summary' | 'controversy_delimitation'
  | 'appeal_effect_suspensive' | 'appeal_mistaken_premise' | 'appeal_fumus'
  | 'appeal_periculum' | 'appeal_countersecurity' | 'appeal_final_requests';
 
-export type CompleteAppealDraft = Record<LegalAiField, string>;
+export type CompleteAppealDraft = Partial<Record<LegalAiField, string>>;
+export interface LegalGenerationProgress {
+  stage: 'uploading' | 'planning' | 'drafting' | 'reviewing' | 'complete';
+  message: string;
+  current: number;
+  total: number;
+  field?: LegalAiField;
+  completedContent?: string;
+}
 export type { LegalIntakeSuggestion } from '../domain/legal-engine/legalIntake';
 
 function safeFilename(name: string): string {
@@ -111,18 +120,24 @@ export const legalAiService={
    if(!Array.isArray(body.suggestions)) throw new Error('A triagem assistida retornou um formato inválido.');
    return body.suggestions as LegalIntakeSuggestion[];
  },
- async generateCompleteAppeal(context:Record<string,unknown>,sourcePdf:File,organizationId:string,onProgress?:(message:string,current:number,total:number)=>void):Promise<CompleteAppealDraft>{
-   onProgress?.('Armazenando os autos com segurança…',0,9);
+ async generateCompleteAppeal(context:Record<string,unknown>,sourcePdf:File,organizationId:string,onProgress?:(progress:LegalGenerationProgress)=>void):Promise<CompleteAppealDraft>{
+   onProgress?.({stage:'uploading',message:'Armazenando os autos com segurança…',current:0,total:1});
    const prepared=await this.prepareSource(sourcePdf,organizationId);
-   const fields:LegalAiField[]=['appealed_decision','executive_summary','claim_summary','controversy_delimitation','appeal_effect_suspensive','appeal_mistaken_premise','appeal_fumus','appeal_periculum',...(context.countersecurity_allowed?['appeal_countersecurity' as LegalAiField]:[]),'appeal_final_requests'];
+   const fields:LegalAiField[]=['appealed_decision','claim_summary','appeal_effect_suspensive','appeal_mistaken_premise','appeal_fumus','appeal_periculum',...(context.countersecurity_allowed?['appeal_countersecurity' as LegalAiField]:[]),'appeal_final_requests','executive_summary'];
+   onProgress?.({stage:'planning',message:`Arquitetura validada: ${fields.length} tópicos serão produzidos individualmente.`,current:0,total:fields.length});
    const result={} as CompleteAppealDraft;
    for(let index=0;index<fields.length;index++){
      const field=fields[index];
-     onProgress?.(`Redigindo ${index+1} de ${fields.length}: ${field.replace(/_/g,' ')}…`,index+1,fields.length);
-     result[field]=await this.generatePrepared(field,context,prepared);
+     const label=field==='appealed_decision'?'Síntese controlada da decisão':AGRAVO_DRAFT_LABELS[field as keyof typeof AGRAVO_DRAFT_LABELS]||field.replace(/_/g,' ');
+     onProgress?.({stage:'drafting',message:`Redigindo ${index+1} de ${fields.length}: ${label}…`,current:index,total:fields.length,field});
+     result[field]=await this.generatePrepared(field,{...context,completed_sections:result},prepared);
+     onProgress?.({stage:'drafting',message:`Concluído ${index+1} de ${fields.length}: ${label}.`,current:index+1,total:fields.length,field,completedContent:result[field]});
    }
    if(!context.countersecurity_allowed) result.appeal_countersecurity='';
-   return normalizeAgravoFields(result);
+   onProgress?.({stage:'reviewing',message:'Normalizando parágrafos e executando as regras formais da peça…',current:fields.length,total:fields.length});
+   const normalized=normalizeAgravoFields(result as Record<string,string>) as CompleteAppealDraft;
+   onProgress?.({stage:'complete',message:'Redação integral concluída. Revise os tópicos antes de salvar.',current:fields.length,total:fields.length});
+   return normalized;
  },
  async generate(
    field:LegalAiField,

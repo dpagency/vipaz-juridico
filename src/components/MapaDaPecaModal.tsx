@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { ResolvedDocumentAssembly, ValidationError } from '../domain/legal-engine/types';
 import type { LegalIntakeSuggestion } from '../services/legalAiService';
+import { AGRAVO_DRAFT_LABELS, isAgravoDraftField, isFactualIntakeField } from '../domain/legal-engine/legalProductionStages';
 
 interface MapaDaPecaModalProps {
   isOpen: boolean;
@@ -65,6 +66,9 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
 
   const includedEvaluations = assembly.evaluations.filter((e) => e.included);
   const excludedEvaluations = assembly.evaluations.filter((e) => !e.included);
+  const factualErrors = errors.filter(error => isFactualIntakeField(error.field));
+  const draftingErrors = errors.filter(error => isAgravoDraftField(error.field) || error.field === 'controversy_delimitation');
+  const otherErrors = errors.filter(error => !isFactualIntakeField(error.field) && !isAgravoDraftField(error.field) && error.field !== 'controversy_delimitation');
 
   const toggleExpand = (key: string) => {
     setExpandedBlockKey(expandedBlockKey === key ? null : key);
@@ -214,11 +218,12 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
               aria-label="Saneamento assistido das pendências"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div><h4 className="text-sm font-semibold text-white">Saneamento assistido pelos autos</h4><p className="mt-1 text-xs text-slate-400">A IA propõe respostas rastreáveis. Você decide o que será aplicado.</p></div>
-                {onResolveWithAi && <button type="button" onClick={onResolveWithAi} disabled={isResolvingWithAi} className="flex items-center justify-center gap-2 rounded-[5px] bg-cyan-400 px-4 py-2 text-xs font-semibold text-black disabled:opacity-50">{isResolvingWithAi?<Loader2 className="h-4 w-4 animate-spin"/>:<Sparkles className="h-4 w-4"/>}{isResolvingWithAi?'Analisando os autos…':'Resolver pendências com IA'}</button>}
+                <div><h4 className="text-sm font-semibold text-white">1. Saneamento factual pelos autos</h4><p className="mt-1 text-xs text-slate-400">A IA extrai somente dados verificáveis e apresenta evidências. Você revisa antes de aplicar.</p></div>
+                {onResolveWithAi && factualErrors.length > 0 && <button type="button" onClick={onResolveWithAi} disabled={isResolvingWithAi} className="flex items-center justify-center gap-2 rounded-[5px] bg-cyan-400 px-4 py-2 text-xs font-semibold text-black disabled:opacity-50">{isResolvingWithAi?<Loader2 className="h-4 w-4 animate-spin"/>:<Sparkles className="h-4 w-4"/>}{isResolvingWithAi?'Extraindo dados dos autos…':`Resolver ${factualErrors.length} dado(s) com IA`}</button>}
               </div>
               {aiResolutionError && <p role="alert" className="rounded-[5px] border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">{aiResolutionError}</p>}
-              {!aiSuggestions.length && <div className="grid gap-2 sm:grid-cols-2">{errors.map(error=><div key={error.field} className="rounded-[5px] border border-slate-800 bg-black/20 p-3"><p className="font-mono text-[10px] text-cyan-400">{error.field}</p><p className="mt-1 text-xs text-slate-300">{error.message}</p></div>)}</div>}
+              {!aiSuggestions.length && factualErrors.length > 0 && <div className="grid gap-2 sm:grid-cols-2">{factualErrors.map(error=><div key={error.field} className="rounded-[5px] border border-slate-800 bg-black/20 p-3"><p className="font-mono text-[10px] text-cyan-400">{error.field}</p><p className="mt-1 text-xs text-slate-300">{error.message}</p></div>)}</div>}
+              {!factualErrors.length && !aiSuggestions.length && <p className="rounded-[5px] border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-300">Dados factuais completos. A próxima etapa é a redação integral dos tópicos jurídicos.</p>}
               {aiSuggestions.length > 0 && <div className="space-y-2">{aiSuggestions.map(item=>{
                 const checked=selectedSuggestions.includes(item.field); const value=draftValues[item.field]??''; const longValue=value.length>120||['executive_summary','claim_summary','controversy_delimitation','appealed_decision','appeal_effect_suspensive','appeal_mistaken_premise','appeal_fumus','appeal_periculum','appeal_countersecurity','appeal_final_requests'].includes(item.field);
                 return <div key={item.field} className={`rounded-[5px] border p-3 ${item.status==='suggested'?'border-slate-700 bg-[#0F172A]':'border-amber-500/25 bg-amber-500/5'}`}>
@@ -226,6 +231,11 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
                 </div>})}
                 {onApplyAiSuggestions&&<button type="button" disabled={!selectedSuggestions.length} onClick={()=>onApplyAiSuggestions(aiSuggestions.filter(item=>selectedSuggestions.includes(item.field)).map(item=>({...item,status:'suggested' as const,value:draftValues[item.field]??item.value,explanation:item.status==='not_found'?'Informação preenchida manualmente no modal.':item.explanation})))} className="w-full rounded-[5px] border border-cyan-400/40 bg-cyan-400/10 px-4 py-2.5 text-xs font-semibold text-cyan-200 disabled:opacity-40">Aplicar {selectedSuggestions.length} campo(s) revisado(s)</button>}
               </div>}
+              {draftingErrors.length > 0 && <div className="border-t border-cyan-500/20 pt-4">
+                <div className="flex items-start gap-3"><div className="rounded-[5px] bg-cyan-500/10 p-2 text-cyan-400"><FileText className="h-4 w-4"/></div><div><h5 className="text-sm font-semibold text-white">2. Redação integral por tópico</h5><p className="mt-1 text-xs text-slate-400">Estes itens não serão resumidos na triagem. Cada tópico será produzido individualmente, com progresso visível e revisão humana.</p></div></div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">{draftingErrors.map(error=><div key={error.field} className="rounded-[5px] border border-slate-800 bg-black/20 p-3"><p className="text-xs font-medium text-slate-200">{AGRAVO_DRAFT_LABELS[error.field as keyof typeof AGRAVO_DRAFT_LABELS]||error.field}</p><p className="mt-1 text-[11px] text-slate-400">{error.message}</p><span className="mt-2 inline-flex rounded bg-cyan-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-cyan-400">produção por tópico</span></div>)}</div>
+              </div>}
+              {otherErrors.length > 0 && <div className="border-t border-slate-800 pt-3"><p className="mb-2 text-xs font-semibold text-slate-300">Outras validações</p><div className="grid gap-2 sm:grid-cols-2">{otherErrors.map(error=><div key={error.field} className="rounded-[5px] border border-slate-800 bg-black/20 p-3"><p className="font-mono text-[10px] text-rose-400">{error.field}</p><p className="mt-1 text-xs text-slate-300">{error.message}</p></div>)}</div></div>}
             </section>
           )}
           {activeTab === 'flow' && (

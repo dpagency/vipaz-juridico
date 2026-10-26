@@ -2,15 +2,9 @@ import type { Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { generateText, Output } from 'ai';
 import { z } from 'zod';
+import { FACTUAL_INTAKE_FIELDS, isFactualIntakeField } from '../domain/legal-engine/legalProductionStages.js';
 
-const INTAKE_FIELDS = [
-  'process_number','court_number','court_type','court_type_custom','district','uf','client','opposing_party',
-  'executive_summary','claim_summary','controversy_delimitation','adverse_party_nature','dispute_objects',
-  'dispute_objects.outro_descricao','appeal_demand_type','appeal_main_object','appealed_decision','appeal_initial_claim',
-  'appeal_relevant_documents','appeal_contractual_documents','appeal_procedural_history','appeal_specific_instructions',
-  'appeal_effect_suspensive','appeal_mistaken_premise','appeal_fumus','appeal_periculum','appeal_countersecurity',
-  'appeal_final_requests',
-] as const;
+const INTAKE_FIELDS = FACTUAL_INTAKE_FIELDS;
 
 const intakeSuggestionSchema = z.object({
   field: z.enum(INTAKE_FIELDS),
@@ -67,6 +61,9 @@ REGRAS ABSOLUTAS:
 - Diferencie alegação da parte, documento e comando judicial.
 - Para astreintes, não trate advertência como multa fixada e não peça redução de multa inexistente.
 - Linguagem técnica, firme, elegante e objetiva. Cada ponto final encerra o parágrafo. Não use reticências.
+- Desenvolva o tópico com profundidade compatível com uma peça destinada a protocolo, sem resumo artificial ou limite de caracteres, salvo quando a instrução específica estabelecer limite.
+- Construa progressão argumentativa: fato documentado, consequência jurídica, aplicação ao caso e conclusão do tópico.
+- Quando houver multa ou astreintes, examine separadamente comando, hipótese de incidência, prazo, imputabilidade, proporcionalidade, teto e requisitos do art. 537 do CPC.
 - autor, réu, juízo, agravante e agravado em minúsculas quando substantivos comuns.
 - Não exponha raciocínio interno, checklist ou comentários sobre estas instruções.
 - O usuário editará o texto antes da produção final.
@@ -176,7 +173,8 @@ export async function handleLegalAiField(req:Request,res:Response) {
             },
           ],
         }],
-        maxOutputTokens: field === 'appealed_decision' ? 1800 : 5000,
+        maxOutputTokens: field === 'executive_summary' ? 3000 : field === 'appealed_decision' ? 4000 : 12000,
+        reasoning: 'low',
         temperature: 0.15,
       });
       content = result.text.trim();
@@ -205,7 +203,7 @@ export async function handleLegalAiIntake(req:Request,res:Response) {
     if (!(await validateSession(req))) return res.status(401).json({error:'Sessão inválida ou expirada.'});
     const {context,source_pdf,pending_fields}=req.body||{};
     const requested = Array.isArray(pending_fields)
-      ? [...new Set(pending_fields.filter((field:unknown):field is typeof INTAKE_FIELDS[number] => typeof field==='string' && (INTAKE_FIELDS as readonly string[]).includes(field)))]
+      ? [...new Set(pending_fields.filter((field:unknown):field is typeof INTAKE_FIELDS[number] => typeof field==='string' && isFactualIntakeField(field)))]
       : [];
     if(!requested.length) return res.status(400).json({error:'Nenhuma pendência compatível foi informada.'});
     if(!source_pdf?.storage_path || source_pdf?.mime_type!=='application/pdf') return res.status(400).json({error:'Anexe os autos processuais em PDF antes da análise assistida.'});
@@ -227,9 +225,8 @@ REGRAS ABSOLUTAS:
 - Para process_number use CNJ; court_number somente algarismos; court_type somente Vara Cível, Juizado Especial Cível ou Outro; uf somente RJ, SP, MG ou BA.
 - adverse_party_nature: value deve ser pf, pj ou pf,pj.
 - dispute_objects: value deve ser lista separada por vírgulas entre reajuste_anual_pme, reajuste_anual_individual, reajuste_etario_pme, reajuste_etario_individual, aviso_previo, premio_complementar, outro.
-- Nos campos jurídicos extensos, produza texto limpo, tecnicamente prudente, sem referências artificiais, sem reticências e com um período por parágrafo, exceto na ementa.
-- Nesta etapa de saneamento, limite cada campo jurídico extenso a 3.500 caracteres. A redação integral será produzida depois, campo a campo.
-- A ementa deve ter até 2.000 caracteres, abertura em caixa alta e itens numerados.
+- Esta etapa é exclusivamente factual. Não redija ementa, fundamentos, teses, efeito suspensivo, fumus, periculum, contracautela ou pedidos finais.
+- Para appealed_decision, appeal_initial_claim, appeal_relevant_documents, appeal_contractual_documents e appeal_procedural_history, extraia uma síntese factual rastreável, sem argumentação jurídica.
 - Autor, réu, juízo, agravante e agravado devem ter iniciais minúsculas quando substantivos comuns.
 - Contracautela somente quando os autos tratarem de reajuste.`,
       messages:[{role:'user',content:[
@@ -237,7 +234,7 @@ REGRAS ABSOLUTAS:
         {type:'file',data:signedData.signedUrl,mediaType:'application/pdf',filename:source_pdf.name||'autos.pdf'},
       ]}],
       reasoning:'none',
-      maxOutputTokens:20000,
+      maxOutputTokens:8000,
       temperature:0.1,
     });
     const byField=new Map(output.suggestions.map(item=>[item.field,item]));

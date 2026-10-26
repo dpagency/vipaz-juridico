@@ -48,6 +48,7 @@ import {
   CawDocxGenerationResult,
 } from '../services/docxGenerationService';
 import { MapaDaPecaModal } from '../components/MapaDaPecaModal';
+import { LegalProductionJourney } from '../components/LegalProductionJourney';
 import { PdfUploader, SelectedPdfFile } from '../components/PdfUploader';
 import {
   DOCUMENT_PIECES_CATALOG,
@@ -55,10 +56,12 @@ import {
   HOMOLOGATED_CASE_DEFAULTS,
 } from '../domain/legal-engine/formDefinitions';
 import { isPieceHomologated } from '../domain/legal-engine/architectureRegistry';
-import { legalAiService, LegalAiField, type LegalIntakeSuggestion } from '../services/legalAiService';
+import { legalAiService, LegalAiField, type LegalGenerationProgress, type LegalIntakeSuggestion } from '../services/legalAiService';
 import { WorkspacePage, WorkspacePageHeader } from '../components/WorkspacePage';
 import { legalProductionService } from '../services/legalProductionService';
 import { applyLegalIntakeSuggestions } from '../domain/legal-engine/legalIntake';
+import { validateAgravoDraft } from '../domain/legal-engine/agravoQuality';
+import { AGRAVO_DRAFT_FIELDS, isFactualIntakeField } from '../domain/legal-engine/legalProductionStages';
 
 interface NovaPecaViewProps {
   organization: Organization;
@@ -122,7 +125,7 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [generatingAiField, setGeneratingAiField] = useState<LegalAiField | null>(null);
   const [isGeneratingCompleteAppeal, setIsGeneratingCompleteAppeal] = useState(false);
-  const [completeAppealProgress, setCompleteAppealProgress] = useState('');
+  const [completeAppealProgress, setCompleteAppealProgress] = useState<LegalGenerationProgress | null>(null);
   const [aiFieldError, setAiFieldError] = useState<string | null>(null);
   const [intakeSuggestions, setIntakeSuggestions] = useState<LegalIntakeSuggestion[]>([]);
   const [isResolvingIntake, setIsResolvingIntake] = useState(false);
@@ -171,12 +174,25 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
   const countersecurityAllowed = Boolean(
     formData.dispute_objects.reajuste_anual || formData.dispute_objects.reajuste_etario
   );
+  const liveValidationErrors = useMemo(() => ruleEngine.evaluate(formData).errors, [formData]);
+  const modalValidationErrors = useMemo(() => {
+    const currentErrors = new Map(liveValidationErrors.map(error => [error.field, error]));
+    Object.entries(clientErrors).forEach(([field, message]) => currentErrors.set(field, { field, message }));
+    return Array.from(currentErrors.values());
+  }, [clientErrors, liveValidationErrors]);
+  const factualPendingCount = liveValidationErrors.filter(error => isFactualIntakeField(error.field)).length;
+  const activeDraftFields = useMemo(
+    () => AGRAVO_DRAFT_FIELDS.filter(field => field !== 'appeal_countersecurity' || countersecurityAllowed),
+    [countersecurityAllowed]
+  );
+  const completedDrafts = activeDraftFields.filter(field => String(formData[field] || '').trim()).length;
+  const agravoQualityPendingCount = isAgravo ? validateAgravoDraft(formData).length : 0;
 
   const handleResolvePendingWithAi = async () => {
     if(isResolvingIntake) return;
     if(!selectedFile?.fileObj){setIntakeResolutionError('Anexe os autos em PDF antes de solicitar o saneamento assistido.');return;}
-    const pendingFields=Object.keys(clientErrors).filter(field=>field!=='submit'&&field!=='document_piece');
-    if(!pendingFields.length){setIntakeResolutionError('Não há pendências compatíveis para analisar.');return;}
+    const pendingFields=liveValidationErrors.map(error=>error.field).filter(isFactualIntakeField);
+    if(!pendingFields.length){setIntakeResolutionError('Os dados factuais estão completos. Os tópicos jurídicos devem ser produzidos na etapa de redação integral.');return;}
     setIsResolvingIntake(true);setIntakeResolutionError(null);setIntakeSuggestions([]);
     try{
       const suggestions=await legalAiService.resolvePending({organization_id:organization.id,document_piece:formData.document_piece,current_form:formData},selectedFile.fileObj,organization.id,pendingFields);
@@ -253,9 +269,14 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
     setIsGeneratingCompleteAppeal(true); setAiFieldError(null);
     try {
       const context={document_piece:formData.document_piece,organization_id:organization.id,process_number:formData.process_number,tribunal:formData.uf,juizo_origem:[formData.court_number,formData.court_type,formData.district,formData.uf].filter(Boolean).join(' · '),agravante:formData.client,agravado:formData.opposing_party,tipo_demanda:formData.appeal_demand_type,objeto_demanda:formData.appeal_main_object,decisao_agravada:formData.appealed_decision,peticao_inicial:formData.appeal_initial_claim,documentos_relevantes:formData.appeal_relevant_documents,documentacao_contratual:formData.appeal_contractual_documents,historico_processual:formData.appeal_procedural_history,instrucoes_especificas:formData.appeal_specific_instructions,countersecurity_allowed:countersecurityAllowed,dispute_objects:formData.dispute_objects,injunction_status:formData.injunction_status};
-      const draft=await legalAiService.generateCompleteAppeal(context,selectedFile.fileObj,organization.id,message=>setCompleteAppealProgress(message));
+      const draft=await legalAiService.generateCompleteAppeal(context,selectedFile.fileObj,organization.id,progress=>{
+        setCompleteAppealProgress(progress);
+        if(progress.field&&progress.completedContent){
+          setFormData(previous=>({...previous,[progress.field!]:progress.completedContent}));
+          setClientErrors(previous=>{const next={...previous};delete next[progress.field!];return next;});
+        }
+      });
       setFormData(previous=>({...previous,...draft}));
-      setCompleteAppealProgress('Agravo completo gerado. Revise os campos antes de salvar.');
     } catch(err){ setAiFieldError(err instanceof Error?err.message:'Não foi possível gerar o agravo completo.'); }
     finally { setIsGeneratingCompleteAppeal(false); }
   };
@@ -1643,11 +1664,20 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
 </>)}{isAgravo && (
           <div className="space-y-6">
             <div className="p-6 rounded-2xl vipaz-card space-y-5">
-              <div className="flex items-center justify-between border-b vipaz-border-subtle pb-3">
-                <div><h3 className="text-xs font-semibold uppercase tracking-wider vipaz-text-secondary">Contexto do Agravo de Instrumento</h3><p className="mt-1 text-[11px] vipaz-text-muted">A IA analisa os autos uma única vez e redige a peça completa para revisão.</p></div>
-                <button type="button" onClick={handleGenerateAllAiFields} disabled={Boolean(generatingAiField)||isGeneratingCompleteAppeal} className="vipaz-ai-button">{isGeneratingCompleteAppeal?<Loader2 className="w-3.5 h-3.5 animate-spin"/>:<Sparkles className="w-3.5 h-3.5"/>}{isGeneratingCompleteAppeal?'Gerando agravo…':'Gerar agravo completo'}</button>
+              <LegalProductionJourney
+                hasSource={Boolean(selectedFile?.fileObj)}
+                factualPendingCount={factualPendingCount}
+                completedDrafts={completedDrafts}
+                totalDrafts={activeDraftFields.length}
+                qualityPendingCount={agravoQualityPendingCount}
+                persisted={Boolean(persistedSnapshot)}
+                progress={completeAppealProgress}
+              />
+              <div className="flex flex-col gap-3 border-b vipaz-border-subtle pb-3 sm:flex-row sm:items-center sm:justify-between">
+                <div><h3 className="text-xs font-semibold uppercase tracking-wider vipaz-text-secondary">Contexto validado e redação por tópico</h3><p className="mt-1 text-[11px] vipaz-text-muted">A triagem extrai fatos. A redação integral ocorre separadamente para cada tópico e permanece editável.</p></div>
+                <button type="button" onClick={handleGenerateAllAiFields} disabled={Boolean(generatingAiField)||isGeneratingCompleteAppeal||!selectedFile?.fileObj||factualPendingCount>0} className="vipaz-ai-button">{isGeneratingCompleteAppeal?<Loader2 className="w-3.5 h-3.5 animate-spin"/>:<Sparkles className="w-3.5 h-3.5"/>}{isGeneratingCompleteAppeal?'Produzindo por etapas…':'Iniciar redação integral'}</button>
               </div>
-              {completeAppealProgress && <p role="status" className="rounded-[5px] border border-cyan-500/30 bg-cyan-950/30 p-3 text-xs text-cyan-200">{completeAppealProgress}</p>}
+              {factualPendingCount > 0 && <p className="rounded-[5px] border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">Conclua os {factualPendingCount} dado(s) factual(is) pendente(s) no mapa da peça antes de iniciar a redação integral.</p>}
               {aiFieldError && <div className="p-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-800 text-xs">{aiFieldError}</div>}
               <div className="grid gap-3 sm:grid-cols-2">
                 {([['appeal_main_object','Objeto principal da demanda'],['appealed_decision','Decisão agravada'],['appeal_initial_claim','Pedidos da petição inicial'],['appeal_relevant_documents','Documentos relevantes'],['appeal_procedural_history','Histórico processual'],['appeal_specific_instructions','Instruções específicas']] as [keyof LegalFormData,string][]).map(([field,label])=><label key={field} className="vipaz-field-label">{label}<textarea rows={field==='appealed_decision'?5:3} className="vipaz-input mt-2 resize-y normal-case" value={String(formData[field]||'')} onChange={event=>updateField(field,event.target.value as never)} placeholder="A IA utilizará os autos e este contexto; complemente apenas se necessário."/></label>)}
@@ -1723,7 +1753,7 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
         isOpen={isMapaModalOpen}
         onClose={() => setIsMapaModalOpen(false)}
         assembly={evaluation}
-        errors={Object.entries(clientErrors).map(([field, message]) => ({ field, message }))}
+        errors={modalValidationErrors}
         onConfirmGenerate={() => {
           setIsMapaModalOpen(false);
           const form = document.querySelector('form');
