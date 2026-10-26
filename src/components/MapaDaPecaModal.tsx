@@ -3,7 +3,7 @@
  * Pré-visualização determinística de blocos incluídos, excluídos e pedidos finais
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -54,6 +54,7 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
   const [expandedBlockKey, setExpandedBlockKey] = useState<string | null>(null);
   const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([]);
   const [draftValues, setDraftValues] = useState<Record<string,string>>({});
+  const pendingSectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setSelectedSuggestions(aiSuggestions.filter(item => item.status === 'suggested').map(item => item.field));
@@ -67,6 +68,11 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
 
   const toggleExpand = (key: string) => {
     setExpandedBlockKey(expandedBlockKey === key ? null : key);
+  };
+
+  const goToPendingFields = () => {
+    pendingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    pendingSectionRef.current?.focus({ preventScroll: true });
   };
 
   const getCategoryBadge = (cat: string) => {
@@ -143,10 +149,15 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
           </div>
 
           {errors.length > 0 ? (
-            <div className="flex items-center space-x-1.5 text-rose-400 font-medium bg-rose-500/10 px-2.5 py-1 rounded-md border border-rose-500/20">
+            <button
+              type="button"
+              aria-controls="mapa-pendencias"
+              onClick={goToPendingFields}
+              className="flex items-center space-x-1.5 text-rose-400 font-medium bg-rose-500/10 px-2.5 py-1 rounded-md border border-rose-500/20 transition hover:border-rose-400/50 hover:bg-rose-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70"
+            >
               <AlertCircle className="w-3.5 h-3.5" />
               <span>{errors.length} pendências no formulário</span>
-            </div>
+            </button>
           ) : (
             <div className="flex items-center space-x-1.5 text-emerald-400 font-medium bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -195,7 +206,13 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
         {/* Modal Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {errors.length > 0 && (
-            <section className="rounded-[5px] border border-cyan-500/25 bg-cyan-500/5 p-4 space-y-3" aria-label="Saneamento assistido das pendências">
+            <section
+              id="mapa-pendencias"
+              ref={pendingSectionRef}
+              tabIndex={-1}
+              className="scroll-mt-4 rounded-[5px] border border-cyan-500/25 bg-cyan-500/5 p-4 space-y-3 outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-400/70"
+              aria-label="Saneamento assistido das pendências"
+            >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div><h4 className="text-sm font-semibold text-white">Saneamento assistido pelos autos</h4><p className="mt-1 text-xs text-slate-400">A IA propõe respostas rastreáveis. Você decide o que será aplicado.</p></div>
                 {onResolveWithAi && <button type="button" onClick={onResolveWithAi} disabled={isResolvingWithAi} className="flex items-center justify-center gap-2 rounded-[5px] bg-cyan-400 px-4 py-2 text-xs font-semibold text-black disabled:opacity-50">{isResolvingWithAi?<Loader2 className="h-4 w-4 animate-spin"/>:<Sparkles className="h-4 w-4"/>}{isResolvingWithAi?'Analisando os autos…':'Resolver pendências com IA'}</button>}
@@ -401,9 +418,14 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-[#0F172A]/80">
           <div className="text-xs text-slate-400">
             {errors.length > 0 ? (
-              <span className="text-rose-400">
+              <button
+                type="button"
+                aria-controls="mapa-pendencias"
+                onClick={goToPendingFields}
+                className="text-left text-rose-400 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70"
+              >
                 Corrija os campos pendentes no formulário para salvar o snapshot.
-              </span>
+              </button>
             ) : (
               <span>Pronto para validação e persistência determinística do snapshot.</span>
             )}
