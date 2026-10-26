@@ -36,8 +36,9 @@
 
   --text-primary: #11161A;
   --text-secondary: #3F494F;
-  --text-muted: #657078;
-  --text-subtle: #8B959B;
+  /* WCAG AA on every light application surface, including muted cards. */
+  --text-muted: #536168;
+  --text-subtle: #59666D;
   --text-inverse: #FFFFFF;
 
   /* -------------------------------------------------------
@@ -828,7 +829,7 @@
 .vipaz-map-modal .text-slate-400,
 .vipaz-map-modal .text-slate-500 { color: var(--text-muted) !important; }
 :root:not(.dark) .vipaz-map-modal .text-cyan-300,
-:root:not(.dark) .vipaz-map-modal .text-cyan-400 { color: #087B9D !important; }
+:root:not(.dark) .vipaz-map-modal .text-cyan-400 { color: #066B87 !important; }
 :root:not(.dark) .vipaz-map-modal .text-emerald-300,
 :root:not(.dark) .vipaz-map-modal .text-emerald-400 { color: #067647 !important; }
 :root:not(.dark) .vipaz-map-modal .text-amber-300,
