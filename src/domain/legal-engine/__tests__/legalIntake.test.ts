@@ -16,4 +16,6 @@ assert.deepEqual(result.data.adverse_party_nature,['pf','pj']);
 assert.equal(result.data.dispute_objects.reajuste_anual,true);
 assert.equal(result.data.client,HOMOLOGATED_CASE_DEFAULTS.client);
 assert.deepEqual(result.appliedFields,['process_number','adverse_party_nature','dispute_objects']);
+const manual=applyLegalIntakeSuggestions(result.data,[{...suggestions[4],status:'suggested',value:'Parte preenchida manualmente'}],['client']);
+assert.equal(manual.data.client,'Parte preenchida manualmente');
 console.log('VIPAZ legal intake: controlled application contract passed');

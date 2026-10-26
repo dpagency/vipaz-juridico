@@ -185,13 +185,13 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
     finally{setIsResolvingIntake(false);}
   };
 
-  const handleApplyIntakeSuggestions = (fields:string[]) => {
-    setFormData(previous=>{
-      const next=applyLegalIntakeSuggestions(previous,intakeSuggestions,fields).data;
-      const check=ruleEngine.evaluate(next);const nextErrors:Record<string,string>={};check.errors.forEach(error=>{nextErrors[error.field]=error.message;});setClientErrors(nextErrors);
-      return next;
-    });
-    setIntakeSuggestions([]);setIntakeResolutionError(null);
+  const handleApplyIntakeSuggestions = (suggestions:LegalIntakeSuggestion[]) => {
+    const result=applyLegalIntakeSuggestions(formData,suggestions,suggestions.map(item=>item.field));
+    setFormData(result.data);
+    const check=ruleEngine.evaluate(result.data);const nextErrors:Record<string,string>={};check.errors.forEach(error=>{nextErrors[error.field]=error.message;});setClientErrors(nextErrors);
+    const rejected=suggestions.map(item=>item.field).filter(field=>!result.appliedFields.includes(field));
+    if(rejected.length){setIntakeSuggestions(suggestions);setIntakeResolutionError(`Revise os valores não aceitos pelo contrato do formulário: ${rejected.join(', ')}.`);}
+    else{setIntakeSuggestions([]);setIntakeResolutionError(null);}
   };
 
   const handleGenerateAiField = async (field: LegalAiField) => {
