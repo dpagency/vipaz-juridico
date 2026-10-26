@@ -21,7 +21,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { ResolvedDocumentAssembly, ValidationError } from '../domain/legal-engine/types';
-import type { LegalIntakeSuggestion } from '../services/legalAiService';
+import type { LegalGenerationProgress, LegalIntakeSuggestion } from '../services/legalAiService';
 import { AGRAVO_DRAFT_LABELS, isAgravoDraftField, isFactualIntakeField } from '../domain/legal-engine/legalProductionStages';
 
 interface MapaDaPecaModalProps {
@@ -36,6 +36,9 @@ interface MapaDaPecaModalProps {
   aiSuggestions?: LegalIntakeSuggestion[];
   isResolvingWithAi?: boolean;
   aiResolutionError?: string | null;
+  onStartAiDrafting?: () => void;
+  isAiDrafting?: boolean;
+  aiDraftingProgress?: LegalGenerationProgress | null;
 }
 
 export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
@@ -50,6 +53,9 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
   aiSuggestions = [],
   isResolvingWithAi = false,
   aiResolutionError = null,
+  onStartAiDrafting,
+  isAiDrafting = false,
+  aiDraftingProgress = null,
 }) => {
   const [activeTab, setActiveTab] = useState<'flow' | 'requests' | 'variables'>('flow');
   const [expandedBlockKey, setExpandedBlockKey] = useState<string | null>(null);
@@ -69,6 +75,10 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
   const factualErrors = errors.filter(error => isFactualIntakeField(error.field));
   const draftingErrors = errors.filter(error => isAgravoDraftField(error.field) || error.field === 'controversy_delimitation');
   const otherErrors = errors.filter(error => !isFactualIntakeField(error.field) && !isAgravoDraftField(error.field) && error.field !== 'controversy_delimitation');
+  const canStartAiDrafting = factualErrors.length === 0 && draftingErrors.length > 0 && Boolean(onStartAiDrafting);
+  const draftingPercentage = aiDraftingProgress?.total
+    ? Math.round((aiDraftingProgress.current / aiDraftingProgress.total) * 100)
+    : 0;
 
   const toggleExpand = (key: string) => {
     setExpandedBlockKey(expandedBlockKey === key ? null : key);
@@ -232,7 +242,8 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
                 {onApplyAiSuggestions&&<button type="button" disabled={!selectedSuggestions.length} onClick={()=>onApplyAiSuggestions(aiSuggestions.filter(item=>selectedSuggestions.includes(item.field)).map(item=>({...item,status:'suggested' as const,value:draftValues[item.field]??item.value,explanation:item.status==='not_found'?'Informação preenchida manualmente no modal.':item.explanation})))} className="w-full rounded-[5px] border border-cyan-400/40 bg-cyan-400/10 px-4 py-2.5 text-xs font-semibold text-cyan-200 disabled:opacity-40">Aplicar {selectedSuggestions.length} campo(s) revisado(s)</button>}
               </div>}
               {draftingErrors.length > 0 && <div className="border-t border-cyan-500/20 pt-4">
-                <div className="flex items-start gap-3"><div className="rounded-[5px] bg-cyan-500/10 p-2 text-cyan-400"><FileText className="h-4 w-4"/></div><div><h5 className="text-sm font-semibold text-white">2. Redação integral por tópico</h5><p className="mt-1 text-xs text-slate-400">Estes itens não serão resumidos na triagem. Cada tópico será produzido individualmente, com progresso visível e revisão humana.</p></div></div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div className="flex items-start gap-3"><div className="rounded-[5px] bg-cyan-500/10 p-2 text-cyan-400"><FileText className="h-4 w-4"/></div><div><h5 className="text-sm font-semibold text-white">2. Redação integral por tópico</h5><p className="mt-1 text-xs text-slate-400">Estes itens não serão resumidos na triagem. Cada tópico será produzido individualmente, com progresso visível e revisão humana.</p></div></div>{canStartAiDrafting&&<button type="button" onClick={onStartAiDrafting} disabled={isAiDrafting} className="flex shrink-0 items-center justify-center gap-2 rounded-[5px] bg-cyan-400 px-4 py-2 text-xs font-semibold text-black transition hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-60">{isAiDrafting?<Loader2 className="h-4 w-4 animate-spin"/>:<Sparkles className="h-4 w-4"/>}{isAiDrafting?'Redigindo tópicos…':'Iniciar redação integral com IA'}</button>}</div>
+                {isAiDrafting&&aiDraftingProgress&&<div role="status" aria-live="polite" className="mt-3 rounded-[5px] border border-cyan-500/25 bg-black/20 p-3"><div className="flex items-center justify-between gap-3 text-[11px]"><span className="text-cyan-200">{aiDraftingProgress.message}</span><span className="shrink-0 font-mono text-slate-400">{aiDraftingProgress.current}/{aiDraftingProgress.total}</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-[5px] bg-slate-800"><div className="h-full bg-cyan-400 transition-[width] duration-300" style={{width:`${draftingPercentage}%`}}/></div><p className="mt-2 text-[10px] text-slate-500">Cada tópico concluído é preservado imediatamente e continuará editável.</p></div>}
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">{draftingErrors.map(error=><div key={error.field} className="rounded-[5px] border border-slate-800 bg-black/20 p-3"><p className="text-xs font-medium text-slate-200">{AGRAVO_DRAFT_LABELS[error.field as keyof typeof AGRAVO_DRAFT_LABELS]||error.field}</p><p className="mt-1 text-[11px] text-slate-400">{error.message}</p><span className="mt-2 inline-flex rounded bg-cyan-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-cyan-400">produção por tópico</span></div>)}</div>
               </div>}
               {otherErrors.length > 0 && <div className="border-t border-slate-800 pt-3"><p className="mb-2 text-xs font-semibold text-slate-300">Outras validações</p><div className="grid gap-2 sm:grid-cols-2">{otherErrors.map(error=><div key={error.field} className="rounded-[5px] border border-slate-800 bg-black/20 p-3"><p className="font-mono text-[10px] text-rose-400">{error.field}</p><p className="mt-1 text-xs text-slate-300">{error.message}</p></div>)}</div></div>}

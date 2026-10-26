@@ -1767,6 +1767,9 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
         aiSuggestions={intakeSuggestions}
         isResolvingWithAi={isResolvingIntake}
         aiResolutionError={intakeResolutionError}
+        onStartAiDrafting={isAgravo ? handleGenerateAllAiFields : undefined}
+        isAiDrafting={isGeneratingCompleteAppeal}
+        aiDraftingProgress={completeAppealProgress}
       />
     </WorkspacePage>
   );
