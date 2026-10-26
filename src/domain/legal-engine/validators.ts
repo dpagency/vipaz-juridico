@@ -5,6 +5,7 @@
 
 import { LegalFormData, ValidationError, ResolvedDocumentAssembly } from './types.js';
 import { isPieceHomologated } from './architectureRegistry.js';
+import { validateAgravoDraft } from './agravoQuality.js';
 
 /**
  * Validação estrita do formulário da Nova Peça
@@ -141,6 +142,7 @@ export function validateLegalForm(data: Partial<LegalFormData>): ValidationError
   // 4. Validações Condicionais
   // Tutela de urgência e dano moral utilizam blocos homologados diretamente sem exigir texto manual do usuário
 
+  errors.push(...validateAgravoDraft(data));
   return errors;
 }
 

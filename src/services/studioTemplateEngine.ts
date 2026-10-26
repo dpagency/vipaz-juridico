@@ -154,3 +154,59 @@ export async function renderStudioDocx(file: Blob, data: StudioData): Promise<Bl
   new Uint8Array(buffer).set(bytes);
   return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 }
+
+export interface StudioCompositionBinding {
+  path: string;
+  paragraphIndex: number;
+  mode?: 'required' | 'direct' | 'conditional' | 'combined';
+  conditions?: Array<{ path: string; equals: string }>;
+  operator?: 'AND' | 'OR';
+  range?: { start: number; end: number };
+  endParagraphIndex?: number;
+}
+
+function conditionMatches(binding: StudioCompositionBinding, data: StudioData): boolean {
+  const checks=(binding.conditions||[]).map(condition=>String(resolve(data,condition.path)??'')===condition.equals);
+  if(binding.mode==='conditional') return checks.length>0&&checks[0];
+  if(binding.mode==='combined') return checks.length>0&&(binding.operator==='OR'?checks.some(Boolean):checks.every(Boolean));
+  return true;
+}
+
+function replaceParagraphText(paragraph:string,text:string):string {
+  let replaced=false;
+  return paragraph.replace(/<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g,()=>{
+    if(replaced) return '<w:t></w:t>';
+    replaced=true;
+    return '<w:t xml:space="preserve">'+xmlEscape(text)+'</w:t>';
+  });
+}
+
+export async function renderStudioCompositionDocx(file:Blob,bindings:StudioCompositionBinding[],data:StudioData):Promise<Blob>{
+  const zip=await JSZip.loadAsync(await file.arrayBuffer());
+  const entry=zip.file('word/document.xml');
+  if(!entry) throw new Error('DOCX inválido: documento principal ausente');
+  const xml=await entry.async('string');
+  const byParagraph=new Map<number,StudioCompositionBinding[]>();
+  for(const binding of bindings||[]) byParagraph.set(binding.paragraphIndex,[...(byParagraph.get(binding.paragraphIndex)||[]),binding]);
+  const removed=new Set<number>();
+  for(const binding of bindings||[]) if(!conditionMatches(binding,data)) for(let i=binding.paragraphIndex;i<=(binding.endParagraphIndex??binding.paragraphIndex);i++) removed.add(i);
+  let paragraphIndex=-1;
+  const output=xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g,paragraph=>{
+    paragraphIndex++;
+    if(removed.has(paragraphIndex)) return '';
+    let text=textOf(paragraph);
+    for(const binding of byParagraph.get(paragraphIndex)||[]){
+      if(!conditionMatches(binding,data)||binding.mode==='required') continue;
+      const value=resolve(data,binding.path);
+      if(value===undefined||value===null) throw new Error(`Campo obrigatório ausente no modelo: ${binding.path}`);
+      const rendered=Array.isArray(value)?value.join('\n'):String(value);
+      if(binding.range){ text=text.slice(0,binding.range.start)+rendered+text.slice(binding.range.end); }
+      else text=rendered;
+    }
+    return replaceParagraphText(paragraph,text);
+  });
+  zip.file('word/document.xml',output);
+  const bytes=await zip.generateAsync({type:'uint8array'});
+  const buffer=new ArrayBuffer(bytes.byteLength); new Uint8Array(buffer).set(bytes);
+  return new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}

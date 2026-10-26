@@ -5,12 +5,14 @@
 
 import { DocumentPieceType, LegalArchitecture } from './types.js';
 import { CONTESTACAO_PME_ARCHITECTURE } from './data/contestacao/architecture.js';
+import { AGRAVO_INSTRUMENTO_ARCHITECTURE } from './data/agravo/architecture.js';
 
 /**
  * Mapeamento central de arquiteturas homologadas
  */
 const ARCHITECTURES_MAP: Partial<Record<DocumentPieceType, LegalArchitecture>> = {
   Contestação: CONTESTACAO_PME_ARCHITECTURE,
+  'Agravo de Instrumento': AGRAVO_INSTRUMENTO_ARCHITECTURE,
 };
 
 /**

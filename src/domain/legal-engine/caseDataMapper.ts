@@ -41,6 +41,12 @@ export interface CustomTextsSnapshot {
   claim_summary: string;
   controversy_delimitation: string;
   other_dispute_object: string | null;
+  appeal_effect_suspensive?: string;
+  appeal_mistaken_premise?: string;
+  appeal_fumus?: string;
+  appeal_periculum?: string;
+  appeal_countersecurity?: string;
+  appeal_final_requests?: string;
 }
 
 export interface AuditBlockSnapshot {
@@ -237,6 +243,12 @@ export function mapCustomTexts(formData: LegalFormData): CustomTextsSnapshot {
     claim_summary: formData.claim_summary,
     controversy_delimitation: formData.controversy_delimitation,
     other_dispute_object: otherDesc,
+    appeal_effect_suspensive: formData.appeal_effect_suspensive || '',
+    appeal_mistaken_premise: formData.appeal_mistaken_premise || '',
+    appeal_fumus: formData.appeal_fumus || '',
+    appeal_periculum: formData.appeal_periculum || '',
+    appeal_countersecurity: formData.appeal_countersecurity || '',
+    appeal_final_requests: formData.appeal_final_requests || '',
   };
 }
 

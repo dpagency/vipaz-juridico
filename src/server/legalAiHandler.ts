@@ -1,7 +1,9 @@
 import type { Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
+import { generateText } from 'ai';
 
 const ALLOWED_FIELDS = new Set([
+  'appealed_decision',
   'executive_summary',
   'claim_summary',
   'controversy_delimitation',
@@ -14,6 +16,7 @@ const ALLOWED_FIELDS = new Set([
 ]);
 
 const FIELD_GUIDANCE: Record<string,string> = {
+  appealed_decision: 'Identifique nos autos e sintetize fielmente a decisão agravada: data, comando, obrigação, prazo, multa ou astreintes, valor, periodicidade e fundamento declarado. Se algum elemento não estiver disponível, sinalize a lacuna sem inventar.',
   executive_summary: 'Redija EMENTA EXECUTIVA com no máximo 2.000 caracteres, abertura temática em caixa alta e itens numerados. Use apenas fundamentos que possam ser sustentados pelo contexto.',
   claim_summary: 'Redija o tópico 1. DO OBJETO DO RECURSO E SÍNTESE DA CONTROVÉRSIA. Diferencie pedido, decisão efetivamente proferida e objeto devolvido ao Tribunal.',
   controversy_delimitation: 'Redija uma delimitação objetiva da controvérsia recursal, identificando o comando impugnado e a questão jurídica central, sem antecipar fatos inexistentes.',
@@ -88,7 +91,6 @@ export async function handleLegalAiField(req:Request,res:Response) {
   try {
     if (!(await validateSession(req))) return res.status(401).json({error:'Sessão inválida ou expirada.'});
     const webhookUrl=process.env.LEGAL_AI_N8N_WEBHOOK_URL;
-    if(!webhookUrl) return res.status(503).json({error:'Workflow de IA ainda não configurado no servidor.'});
 
     const {field,context,source_pdf}=req.body||{};
     if(!ALLOWED_FIELDS.has(field)) return res.status(400).json({error:'Campo não autorizado para geração assistida.'});
@@ -115,25 +117,56 @@ export async function handleLegalAiField(req:Request,res:Response) {
     };
     if(field==='appeal_countersecurity' && !context?.countersecurity_allowed) return res.status(400).json({error:'Contracautela não autorizada pelas regras do caso.'});
 
-    const response=await fetch(webhookUrl,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','X-VIPAZ-Secret':process.env.LEGAL_AI_N8N_SECRET||''},
-      body:JSON.stringify({
-        task:'generate_legal_field',
-        field,
-        field_guidance: context?.document_piece === 'Contestação' && ['executive_summary','claim_summary','controversy_delimitation'].includes(field)
-          ? undefined
-          : FIELD_GUIDANCE[field],
-        system_instruction:buildSystemInstruction(field, context?.document_piece),
-        context,
-        source_pdf: sourcePdfForWorkflow,
-        source_pdf_mode: 'signed_url',
-      })
-    });
-    if(!response.ok){const body=await response.text(); console.error('[VIPAZ][LegalAI][n8n]',response.status,body); return res.status(502).json({error:'Falha no workflow de geração assistida. Tente novamente.'});}
-    const data:any=await response.json();
-    const content=String(data?.content||data?.text||data?.output||'').trim();
-    if(!content) return res.status(502).json({error:'O workflow não retornou conteúdo utilizável.'});
+    let content = '';
+    if (webhookUrl) {
+      const response=await fetch(webhookUrl,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-VIPAZ-Secret':process.env.LEGAL_AI_N8N_SECRET||''},
+        body:JSON.stringify({
+          task:'generate_legal_field',
+          field,
+          field_guidance: context?.document_piece === 'Contestação' && ['executive_summary','claim_summary','controversy_delimitation'].includes(field)
+            ? undefined
+            : FIELD_GUIDANCE[field],
+          system_instruction:buildSystemInstruction(field, context?.document_piece),
+          context,
+          source_pdf: sourcePdfForWorkflow,
+          source_pdf_mode: 'signed_url',
+        })
+      });
+      if(!response.ok){const body=await response.text(); console.error('[VIPAZ][LegalAI][n8n]',response.status,body); return res.status(502).json({error:'Falha no workflow de geração assistida. Tente novamente.'});}
+      const data:any=await response.json();
+      content=String(data?.content||data?.text||data?.output||'').trim();
+    } else {
+      const result = await generateText({
+        model: process.env.AI_GATEWAY_MODEL || 'google/gemini-2.5-flash',
+        system: buildSystemInstruction(field, context?.document_piece),
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `Analise os autos anexos e produza somente o campo solicitado.\n\nCONTEXTO ESTRUTURADO:\n${JSON.stringify(context ?? {}, null, 2)}`,
+            },
+            {
+              type: 'file',
+              data: signedData.signedUrl,
+              mediaType: 'application/pdf',
+              filename: sourcePdfForWorkflow.name,
+            },
+          ],
+        }],
+        maxOutputTokens: field === 'appealed_decision' ? 1800 : 5000,
+        temperature: 0.15,
+      });
+      content = result.text.trim();
+    }
+    if(!content) return res.status(502).json({error:'O motor de IA não retornou conteúdo utilizável.'});
     return res.json({content});
-  } catch(error){console.error('[VIPAZ][LegalAI] erro:',error); return res.status(500).json({error:'Não foi possível concluir a assistência por IA.'});}
+  } catch(error){
+    console.error('[VIPAZ][LegalAI] erro:',error);
+    const message=error instanceof Error ? error.message : '';
+    if(/credit|payment|quota|rate limit/i.test(message)) return res.status(503).json({error:'O serviço de IA está temporariamente sem cota disponível. Tente novamente em instantes.'});
+    return res.status(500).json({error:'Não foi possível concluir a assistência por IA.'});
+  }
 }

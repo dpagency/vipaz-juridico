@@ -63,6 +63,7 @@ interface NovaPecaViewProps {
   organization: Organization;
   onNavigate: (path: string) => void;
 }
+const INSTITUTIONAL_TEMPLATE_ID='institutional-legal-architecture-v1';
 
 export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
   organization,
@@ -119,6 +120,8 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
   } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [generatingAiField, setGeneratingAiField] = useState<LegalAiField | null>(null);
+  const [isGeneratingCompleteAppeal, setIsGeneratingCompleteAppeal] = useState(false);
+  const [completeAppealProgress, setCompleteAppealProgress] = useState('');
   const [aiFieldError, setAiFieldError] = useState<string | null>(null);
   const [approvedTemplates, setApprovedTemplates] = useState<DocumentTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -130,8 +133,8 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
       if (!active) return;
       const approved = rows.filter(row => row.status === 'approved');
       setApprovedTemplates(approved);
-      setSelectedTemplateId(current => current && approved.some(row => row.id === current) ? current : (approved[0]?.id || ''));
-      setTemplateMessage(approved.length ? '' : 'Nenhum modelo homologado. Envie um DOCX pelo Studio e homologue-o na Library.');
+      setSelectedTemplateId(current => current && (current===INSTITUTIONAL_TEMPLATE_ID||approved.some(row => row.id === current)) ? current : (approved[0]?.id || INSTITUTIONAL_TEMPLATE_ID));
+      setTemplateMessage(approved.length ? '' : 'Usando a arquitetura institucional homologada. Você pode adicionar um DOCX próprio pelo Studio.');
     }).catch(error => { if (active) setTemplateMessage(error instanceof Error ? error.message : 'Falha ao carregar modelos.'); });
     return () => { active = false; };
   }, [organization.id]);
@@ -216,24 +219,19 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
   };
 
   const handleGenerateAllAiFields = async () => {
-    if (generatingAiField) return;
+    if (generatingAiField || isGeneratingCompleteAppeal) return;
     if (!selectedFile?.fileObj) {
       setAiFieldError('Anexe os autos processuais em PDF antes de gerar conteúdo com IA.');
       return;
     }
-    const fields: LegalAiField[] = [
-      'executive_summary',
-      'claim_summary',
-      'appeal_effect_suspensive',
-      'appeal_mistaken_premise',
-      'appeal_fumus',
-      'appeal_periculum',
-      ...(countersecurityAllowed ? ['appeal_countersecurity' as LegalAiField] : []),
-      'appeal_final_requests',
-    ];
-    for (const field of fields) {
-      await handleGenerateAiField(field);
-    }
+    setIsGeneratingCompleteAppeal(true); setAiFieldError(null);
+    try {
+      const context={document_piece:formData.document_piece,organization_id:organization.id,process_number:formData.process_number,tribunal:formData.uf,juizo_origem:[formData.court_number,formData.court_type,formData.district,formData.uf].filter(Boolean).join(' · '),agravante:formData.client,agravado:formData.opposing_party,tipo_demanda:formData.appeal_demand_type,objeto_demanda:formData.appeal_main_object,decisao_agravada:formData.appealed_decision,peticao_inicial:formData.appeal_initial_claim,documentos_relevantes:formData.appeal_relevant_documents,documentacao_contratual:formData.appeal_contractual_documents,historico_processual:formData.appeal_procedural_history,instrucoes_especificas:formData.appeal_specific_instructions,countersecurity_allowed:countersecurityAllowed,dispute_objects:formData.dispute_objects,injunction_status:formData.injunction_status};
+      const draft=await legalAiService.generateCompleteAppeal(context,selectedFile.fileObj,organization.id,message=>setCompleteAppealProgress(message));
+      setFormData(previous=>({...previous,...draft}));
+      setCompleteAppealProgress('Agravo completo gerado. Revise os campos antes de salvar.');
+    } catch(err){ setAiFieldError(err instanceof Error?err.message:'Não foi possível gerar o agravo completo.'); }
+    finally { setIsGeneratingCompleteAppeal(false); }
   };
 
   const handleCopy = (text: string, field: string) => {
@@ -408,7 +406,7 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
     e.preventDefault();
     if (isSubmitting) return;
     const selectedTemplate = approvedTemplates.find(template => template.id === selectedTemplateId);
-    if (!selectedTemplate) { setClientErrors({ submit: 'Selecione um modelo homologado antes de produzir a peça.' }); return; }
+    if (!selectedTemplate && selectedTemplateId!==INSTITUTIONAL_TEMPLATE_ID) { setClientErrors({ submit: 'Selecione um modelo homologado antes de produzir a peça.' }); return; }
 
     // Validação formal
     const check = ruleEngine.evaluate(formData);
@@ -437,7 +435,7 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
         }
       );
 
-      await legalProductionService.bindGeneration(result.generation_job_id, selectedTemplate);
+      if(selectedTemplate) await legalProductionService.bindGeneration(result.generation_job_id, selectedTemplate);
 
       setPersistedSnapshot({
         generation_job_id: result.generation_job_id,
@@ -702,6 +700,7 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
           <label className="text-xs font-semibold uppercase tracking-wider vipaz-text-primary">Modelo homologado
             <select required className="mt-3 block w-full rounded-[5px] border vipaz-border-subtle bg-transparent p-3 text-sm" value={selectedTemplateId} onChange={event => setSelectedTemplateId(event.target.value)}>
               <option value="">Selecione a versão aprovada</option>
+              <option value={INSTITUTIONAL_TEMPLATE_ID}>Arquitetura institucional homologada · v1.0</option>
               {approvedTemplates.filter(template => template.document_type === formData.document_piece || template.document_type === 'Outros').map(template => <option key={template.id} value={template.id}>{template.name} · v{template.version}</option>)}
             </select>
           </label>
@@ -1619,10 +1618,14 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
           <div className="space-y-6">
             <div className="p-6 rounded-2xl vipaz-card space-y-5">
               <div className="flex items-center justify-between border-b vipaz-border-subtle pb-3">
-                <div><h3 className="text-xs font-semibold uppercase tracking-wider vipaz-text-secondary">Contexto do Agravo de Instrumento</h3><p className="mt-1 text-[11px] vipaz-text-muted">Gere cada tópico, leia e edite antes da produção final.</p></div>
-                <button type="button" onClick={handleGenerateAllAiFields} disabled={Boolean(generatingAiField)} className="vipaz-ai-button"><Sparkles className="w-3.5 h-3.5"/>Gerar todos com IA</button>
+                <div><h3 className="text-xs font-semibold uppercase tracking-wider vipaz-text-secondary">Contexto do Agravo de Instrumento</h3><p className="mt-1 text-[11px] vipaz-text-muted">A IA analisa os autos uma única vez e redige a peça completa para revisão.</p></div>
+                <button type="button" onClick={handleGenerateAllAiFields} disabled={Boolean(generatingAiField)||isGeneratingCompleteAppeal} className="vipaz-ai-button">{isGeneratingCompleteAppeal?<Loader2 className="w-3.5 h-3.5 animate-spin"/>:<Sparkles className="w-3.5 h-3.5"/>}{isGeneratingCompleteAppeal?'Gerando agravo…':'Gerar agravo completo'}</button>
               </div>
+              {completeAppealProgress && <p role="status" className="rounded-[5px] border border-cyan-500/30 bg-cyan-950/30 p-3 text-xs text-cyan-200">{completeAppealProgress}</p>}
               {aiFieldError && <div className="p-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-800 text-xs">{aiFieldError}</div>}
+              <div className="grid gap-3 sm:grid-cols-2">
+                {([['appeal_main_object','Objeto principal da demanda'],['appealed_decision','Decisão agravada'],['appeal_initial_claim','Pedidos da petição inicial'],['appeal_relevant_documents','Documentos relevantes'],['appeal_procedural_history','Histórico processual'],['appeal_specific_instructions','Instruções específicas']] as [keyof LegalFormData,string][]).map(([field,label])=><label key={field} className="vipaz-field-label">{label}<textarea rows={field==='appealed_decision'?5:3} className="vipaz-input mt-2 resize-y normal-case" value={String(formData[field]||'')} onChange={event=>updateField(field,event.target.value as never)} placeholder="A IA utilizará os autos e este contexto; complemente apenas se necessário."/></label>)}
+              </div>
               {([
                 ['executive_summary','EMENTA EXECUTIVA'],
                 ['claim_summary','DO OBJETO DO RECURSO E SÍNTESE DA CONTROVÉRSIA'],

@@ -21,8 +21,8 @@ export const DOCUMENT_PIECES_CATALOG: DocumentPieceMetadata[] = [
     id: 'Agravo de Instrumento',
     label: 'Agravo de Instrumento',
     description: 'Recurso contra decisão interlocutória, com fundamentação individualizada e assistência de IA para os tópicos variáveis.',
-    isHomologated: false,
-    stage: 'in_development',
+    isHomologated: true,
+    stage: 'production',
   },
   {
     id: 'Recurso Inominado',

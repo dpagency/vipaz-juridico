@@ -8,7 +8,8 @@ export async function extractVipazPdfPages(filePath: string): Promise<string[]> 
   if (bytes.length > 50 * 1024 * 1024 || bytes.subarray(0, 5).toString() !== '%PDF-') {
     throw new Error('VIPAZ_INVALID_PDF');
   }
-  const document = await getDocument({ data: new Uint8Array(bytes), useSystemFonts: true }).promise;
+  const loadingTask = getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
+  const document = await loadingTask.promise;
   const pages: string[] = [];
   try {
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber++) {
@@ -17,7 +18,7 @@ export async function extractVipazPdfPages(filePath: string): Promise<string[]> 
       pages.push(content.items.map(item => 'str' in item ? item.str : '').join(' ').trim());
     }
   } finally {
-    await document.destroy();
+    await loadingTask.destroy();
   }
   if (!pages.some(text => text.length >= 8)) throw new Error('VIPAZ_PDF_OCR_REQUIRED');
   return pages;

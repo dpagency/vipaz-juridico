@@ -586,14 +586,13 @@ export function runRuleEngineTests() {
     console.log('✓ Caso 35: Contestação homologada verificada com sucesso');
   }
 
-  // CASO 36: Agravo de Instrumento NÃO é homologado e acusa erro de validação
+  // CASO 36: Agravo de Instrumento possui arquitetura homologada
   {
-    assert(!isPieceHomologated('Agravo de Instrumento'), 'Caso 36: Agravo de Instrumento NÃO deve ser homologado');
-    const data = createBaseFormData({ document_piece: 'Agravo de Instrumento' });
-    const errors = validateLegalFormData(data);
-    assert(Boolean(errors.document_piece), 'Caso 36: Deve acusar erro de peça não homologada');
+    assert(isPieceHomologated('Agravo de Instrumento'), 'Caso 36: Agravo de Instrumento deve ser homologado');
+    const arch=getArchitectureForPiece('Agravo de Instrumento');
+    assert(arch?.id==='arch_agravo_instrumento_v1','Caso 36: Deve retornar arquitetura própria do agravo');
     passed++;
-    console.log('✓ Caso 36: Agravo de Instrumento não homologado testado com sucesso');
+    console.log('✓ Caso 36: Agravo de Instrumento homologado testado com sucesso');
   }
 
   // CASO 37: Apelação NÃO é homologada
@@ -645,9 +644,12 @@ export function runRuleEngineTests() {
     const contestacaoMetadata = DOCUMENT_PIECES_CATALOG.find((p) => p.id === 'Contestação');
     assert(contestacaoMetadata?.isHomologated === true, 'Caso 38: Metadado de Contestação deve ser homologado');
 
-    // 6. Demais sete não homologadas
-    const nonHomologatedPieces = expectedPieces.filter((p) => p !== 'Contestação');
-    assert(nonHomologatedPieces.length === 7, 'Caso 38: Devem existir exatamente 7 peças não homologadas');
+    // 6. Contestação e Agravo homologados; demais seis não homologadas
+    assert(isPieceHomologated('Agravo de Instrumento'), 'Caso 38: Agravo deve retornar homologado');
+    const agravoMetadata=DOCUMENT_PIECES_CATALOG.find((p)=>p.id==='Agravo de Instrumento');
+    assert(agravoMetadata?.isHomologated===true,'Caso 38: Metadado de Agravo deve ser homologado');
+    const nonHomologatedPieces = expectedPieces.filter((p) => !['Contestação','Agravo de Instrumento'].includes(p));
+    assert(nonHomologatedPieces.length === 6, 'Caso 38: Devem existir exatamente 6 peças não homologadas');
     for (const piece of nonHomologatedPieces) {
       assert(!isPieceHomologated(piece as any), `Caso 38: "${piece}" NÃO deve ser homologada`);
       const meta = DOCUMENT_PIECES_CATALOG.find((p) => p.id === piece);

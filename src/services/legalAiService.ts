@@ -1,10 +1,13 @@
 import * as tus from 'tus-js-client';
 import { supabase } from '../lib/supabase';
+import { normalizeAgravoFields } from '../domain/legal-engine/agravoQuality';
 
 export type LegalAiField =
- | 'executive_summary' | 'claim_summary' | 'controversy_delimitation'
+ | 'appealed_decision' | 'executive_summary' | 'claim_summary' | 'controversy_delimitation'
  | 'appeal_effect_suspensive' | 'appeal_mistaken_premise' | 'appeal_fumus'
  | 'appeal_periculum' | 'appeal_countersecurity' | 'appeal_final_requests';
+
+export type CompleteAppealDraft = Record<LegalAiField, string>;
 
 function safeFilename(name: string): string {
   return (name || 'autos.pdf')
@@ -80,45 +83,44 @@ async function uploadPdfResumable(
 }
 
 export const legalAiService={
+ async prepareSource(sourcePdf:File, organizationId:string){
+   const {data:{session}}=await supabase.auth.getSession();
+   if(!session?.access_token) throw new Error('Sessão expirada. Entre novamente para usar a assistência por IA.');
+   if(!sourcePdf || (sourcePdf.type || 'application/pdf') !== 'application/pdf') throw new Error('Anexe os autos processuais em PDF.');
+   const requestId=crypto.randomUUID();
+   const storagePath=`${organizationId}/ai/${requestId}/${safeFilename(sourcePdf.name)}`;
+   await uploadPdfResumable(sourcePdf,storagePath,session.access_token);
+   return {accessToken:session.access_token,sourcePdf:{name:sourcePdf.name,mime_type:'application/pdf',storage_path:storagePath}};
+ },
+ async generatePrepared(field:LegalAiField,context:Record<string,unknown>,prepared:{accessToken:string;sourcePdf:{name:string;mime_type:string;storage_path:string}}):Promise<string>{
+   const response=await fetch('/api/ai/legal-field',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${prepared.accessToken}`},body:JSON.stringify({field,context,source_pdf:prepared.sourcePdf})});
+   const body=await response.json().catch(()=>({}));
+   if(!response.ok) throw new Error(body?.error||`Falha na geração assistida (HTTP ${response.status}).`);
+   const content=String(body.content||'').trim();
+   if(!content) throw new Error('A geração assistida não retornou conteúdo utilizável.');
+   return content;
+ },
+ async generateCompleteAppeal(context:Record<string,unknown>,sourcePdf:File,organizationId:string,onProgress?:(message:string,current:number,total:number)=>void):Promise<CompleteAppealDraft>{
+   onProgress?.('Armazenando os autos com segurança…',0,9);
+   const prepared=await this.prepareSource(sourcePdf,organizationId);
+   const fields:LegalAiField[]=['appealed_decision','executive_summary','claim_summary','controversy_delimitation','appeal_effect_suspensive','appeal_mistaken_premise','appeal_fumus','appeal_periculum',...(context.countersecurity_allowed?['appeal_countersecurity' as LegalAiField]:[]),'appeal_final_requests'];
+   const result={} as CompleteAppealDraft;
+   for(let index=0;index<fields.length;index++){
+     const field=fields[index];
+     onProgress?.(`Redigindo ${index+1} de ${fields.length}: ${field.replace(/_/g,' ')}…`,index+1,fields.length);
+     result[field]=await this.generatePrepared(field,context,prepared);
+   }
+   if(!context.countersecurity_allowed) result.appeal_countersecurity='';
+   return normalizeAgravoFields(result);
+ },
  async generate(
    field:LegalAiField,
    context:Record<string,unknown>,
    sourcePdf:File,
    organizationId:string
  ):Promise<string>{
-   const {data:{session}}=await supabase.auth.getSession();
-   if(!session?.access_token) throw new Error('Sessão expirada. Entre novamente para usar a assistência por IA.');
-   if(!sourcePdf) throw new Error('Anexe os autos processuais em PDF antes de gerar conteúdo com IA.');
    if(!organizationId) throw new Error('Organização não identificada para armazenamento seguro dos autos.');
-   if((sourcePdf.type || 'application/pdf') !== 'application/pdf') {
-     throw new Error('O arquivo dos autos deve estar no formato PDF.');
-   }
-
-   const requestId = crypto.randomUUID();
-   const storagePath = `${organizationId}/ai/${requestId}/${safeFilename(sourcePdf.name)}`;
-
-   // Autos processuais frequentemente excedem 6 MB. O TUS envia o PDF diretamente
-   // ao hostname dedicado do Supabase Storage em blocos retomáveis, sem atravessar
-   // a Vercel Function e sem expor qualquer chave privilegiada no navegador.
-   await uploadPdfResumable(sourcePdf, storagePath, session.access_token);
-
-   const response=await fetch('/api/ai/legal-field',{
-     method:'POST',
-     headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`},
-     body:JSON.stringify({
-       field,
-       context,
-       source_pdf:{
-         name:sourcePdf.name,
-         mime_type:'application/pdf',
-         storage_path:storagePath,
-       }
-     })
-   });
-   const body=await response.json().catch(()=>({}));
-   if(!response.ok) throw new Error(body?.error||`Falha na geração assistida (HTTP ${response.status}).`);
-   const content=String(body.content||'').trim();
-   if(!content) throw new Error('A geração assistida não retornou conteúdo utilizável.');
-   return content;
+   const prepared=await this.prepareSource(sourcePdf,organizationId);
+   return this.generatePrepared(field,context,prepared);
  }
 };

@@ -20,6 +20,8 @@ import {
 } from '../services/experimentalDocxService.js';
 import { buildCawDocxPayload } from '../domain/legal-engine/documentPayloadMapper.js';
 import { PersistedLegalCaseInput } from '../domain/legal-engine/caseDataMapper.js';
+import { renderStudioCompositionDocx, type StudioCompositionBinding } from '../services/studioTemplateEngine.js';
+import { documentRenderer } from '../services/documentRenderer.js';
 
 
 export async function handleGenerateDocx(req: Request, res: Response): Promise<void> {
@@ -63,6 +65,7 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
 
     // 2. Localizar o generation_job e recuperar a organization_id autêntica
     let organizationId: string | null = null;
+    let generationJob: any = null;
     let finalJobId = cleanJobId;
     let snapshot: PersistedLegalCaseInput | null = null;
 
@@ -75,6 +78,7 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
         .maybeSingle();
 
       if (!jobErr && jobData) {
+        generationJob = jobData;
         organizationId = jobData.organization_id;
       }
     } catch (e) {
@@ -137,7 +141,34 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
     }
     const validSnapshot: PersistedLegalCaseInput = snapshot;
 
-    // 4. Reconstruir a arquitetura determinística existente
+    // 4. Prioriza o DOCX homologado no Studio quando ele possui mapa de composição.
+    if (generationJob?.template_id) {
+      const { data: template } = await client.from('document_templates').select('*').eq('id', generationJob.template_id).eq('status','approved').maybeSingle();
+      const bindings=(template?.composition_map as any)?.bindings as StudioCompositionBinding[]|undefined;
+      if(template?.storage_path&&bindings?.length){
+        const {data:templateFile,error:templateError}=await client.storage.from('document-templates').download(template.storage_path);
+        if(templateError||!templateFile){res.status(502).json({success:false,error:'O modelo homologado não pôde ser carregado.'});return;}
+        const renderData:any={...validSnapshot.basic_data,...validSnapshot.legal_answers,...validSnapshot.custom_texts,basic_data:validSnapshot.basic_data,legal_answers:validSnapshot.legal_answers,custom_texts:validSnapshot.custom_texts};
+        const rendered=await renderStudioCompositionDocx(templateFile,bindings,renderData);
+        const safeProcess=String(validSnapshot.basic_data.process_number||'processo').replace(/[^0-9A-Za-z.-]/g,'_');
+        const filename=`Agravo_de_Instrumento_${safeProcess}_v${template.version}.docx`;
+        const storagePath=`${organizationId}/${finalJobId}/${filename}`;
+        const serviceKey=process.env.SUPABASE_SERVICE_ROLE_KEY||process.env.SUPABASE_SECRET_KEY||'';
+        if(!serviceKey){res.status(503).json({success:false,error:'Credencial de renderização segura não configurada.'});return;}
+        const admin=createClient(supabaseUrl,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
+        const bytes=new Uint8Array(await rendered.arrayBuffer());
+        const {error:uploadError}=await admin.storage.from('generated-documents').upload(storagePath,bytes,{contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',upsert:true});
+        if(uploadError){res.status(502).json({success:false,error:'Falha ao armazenar o DOCX composto: '+uploadError.message});return;}
+        const documentId=crypto.randomUUID();
+        const {error:documentError}=await admin.from('generated_documents').insert({id:documentId,organization_id:organizationId,generation_job_id:finalJobId,process_number:validSnapshot.basic_data.process_number,document_type:generationJob.document_type||'Agravo de Instrumento',version:template.version,docx_storage_path:storagePath,pdf_storage_path:'',template_id:template.id,template_version:template.version,review_status:'awaiting_review',structured_content:{source:'studio_composition_map',template_id:template.id,architecture_id:validSnapshot.architecture_id}});
+        if(documentError){await admin.storage.from('generated-documents').remove([storagePath]);res.status(502).json({success:false,error:'Falha ao registrar o DOCX composto: '+documentError.message});return;}
+        const {data:signed,error:signedError}=await client.storage.from('generated-documents').createSignedUrl(storagePath,3600);
+        if(signedError||!signed?.signedUrl){res.status(502).json({success:false,error:'Documento criado, mas o download não pôde ser autorizado.'});return;}
+        res.status(200).json({success:true,generation_job_id:finalJobId,document_id:documentId,filename,docx_storage_path:storagePath,signed_url:signed.signedUrl,included_blocks_count:bindings.length,linked_requests_count:0,created_at:new Date().toISOString(),duration_ms:Date.now()-startTime,message:'Documento composto com o modelo homologado do Studio.'});return;
+      }
+    }
+
+    // 5. Fallback institucional: reconstruir arquitetura e usar o motor CAW.
     const assembled = assembleDocumentFromSnapshot(validSnapshot, {
       recalculateArchitecture: true,
       filenameSuffix: '',
@@ -163,7 +194,22 @@ export async function handleGenerateDocx(req: Request, res: Response): Promise<v
     const webhookUrl = process.env.N8N_DOCX_WEBHOOK_URL?.trim();
     const webhookSecret = process.env.N8N_DOCX_WEBHOOK_SECRET;
     if (!webhookUrl || !webhookSecret) {
-      res.status(503).json({ success: false, error: 'Motor DOCX não configurado.' });
+      const serviceKey=process.env.SUPABASE_SERVICE_ROLE_KEY||process.env.SUPABASE_SECRET_KEY||'';
+      if(!serviceKey){res.status(503).json({success:false,error:'Credencial de renderização segura não configurada.'});return;}
+      const rendered=await documentRenderer.renderToDocxBlob(assembled.assembly);
+      if(!rendered.size){res.status(502).json({success:false,error:'O renderizador produziu um arquivo vazio.'});return;}
+      const filename=assembled.filename;
+      const storagePath=`${organizationId}/${finalJobId}/${filename}`;
+      const admin=createClient(supabaseUrl,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
+      const bytes=new Uint8Array(await rendered.arrayBuffer());
+      const {error:uploadError}=await admin.storage.from('generated-documents').upload(storagePath,bytes,{contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',upsert:true});
+      if(uploadError){res.status(502).json({success:false,error:'Falha ao armazenar o DOCX: '+uploadError.message});return;}
+      const documentId=crypto.randomUUID();
+      const {error:documentError}=await admin.from('generated_documents').insert({id:documentId,organization_id:organizationId,generation_job_id:finalJobId,process_number:validSnapshot.basic_data.process_number,document_type:generationJob.document_type||assembled.assembly.architecture.documentPiece,version:1,docx_storage_path:storagePath,pdf_storage_path:'',review_status:'awaiting_review',structured_content:{source:'institutional_renderer',architecture_id:validSnapshot.architecture_id}});
+      if(documentError){await admin.storage.from('generated-documents').remove([storagePath]);res.status(502).json({success:false,error:'Falha ao registrar o DOCX: '+documentError.message});return;}
+      const {data:signed,error:signedError}=await client.storage.from('generated-documents').createSignedUrl(storagePath,3600);
+      if(signedError||!signed?.signedUrl){res.status(502).json({success:false,error:'Documento criado, mas o download não pôde ser autorizado.'});return;}
+      res.status(200).json({success:true,generation_job_id:finalJobId,document_id:documentId,filename,docx_storage_path:storagePath,signed_url:signed.signedUrl,included_blocks_count:assembled.includedBlocksCount,linked_requests_count:assembled.linkedRequestsCount,created_at:new Date().toISOString(),duration_ms:Date.now()-startTime,message:'Documento DOCX produzido pelo renderizador institucional VIPAZ.'});
       return;
     }
 

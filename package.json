@@ -12,34 +12,35 @@
     "test": "tsx src/domain/legal-engine/__tests__/ruleEngine.test.ts && tsx src/domain/legal-engine/__tests__/snapshotPersistence.test.ts && tsx src/domain/legal-engine/__tests__/experimentalDocx.test.ts && tsx src/domain/legal-engine/__tests__/phase4_1_architecture.test.ts && tsx src/domain/legal-engine/__tests__/phase4_2_block_integrity.test.ts && tsx src/domain/legal-engine/__tests__/phase5_caw_integration.test.ts && tsx src/domain/legal-engine/__tests__/phase5_1_carbone_contract.test.ts && tsx src/domain/legal-engine/__tests__/phase5_2_caw_v2_sync.test.ts",
     "lint": "tsc --noEmit",
     "test:studio": "tsx src/domain/legal-engine/__tests__/vipazStudio.test.ts",
-    "test:delivery-quality": "tsx src/domain/legal-engine/__tests__/vipazCompositionContract.test.ts && tsx src/domain/legal-engine/__tests__/vipazMcpQualityTools.test.ts && tsx src/domain/legal-engine/__tests__/vipazDeliveryQualityGateway.test.ts && tsx src/domain/legal-engine/__tests__/vipazReviewedDocxRenderer.test.ts && tsx src/domain/legal-engine/__tests__/vipazProductionPipeline.test.ts && tsx src/domain/legal-engine/__tests__/vipazSupabaseRepository.test.ts && tsx src/domain/legal-engine/__tests__/vipazPdfIngestion.test.ts && tsx src/domain/legal-engine/__tests__/vipazPdfExtractionIntegration.test.ts"
+    "test:delivery-quality": "tsx src/domain/legal-engine/__tests__/agravoQuality.test.ts && tsx src/domain/legal-engine/__tests__/vipazCompositionContract.test.ts && tsx src/domain/legal-engine/__tests__/vipazMcpQualityTools.test.ts && tsx src/domain/legal-engine/__tests__/vipazDeliveryQualityGateway.test.ts && tsx src/domain/legal-engine/__tests__/vipazReviewedDocxRenderer.test.ts && tsx src/domain/legal-engine/__tests__/vipazProductionPipeline.test.ts && tsx src/domain/legal-engine/__tests__/vipazSupabaseRepository.test.ts && tsx src/domain/legal-engine/__tests__/vipazPdfIngestion.test.ts && tsx src/domain/legal-engine/__tests__/vipazPdfExtractionIntegration.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@supabase/supabase-js": "^2.116.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
+    "ai": "^7.0.153",
     "docx": "^9.7.1",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "pdfjs-dist": "^6.2.108",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "vite": "^8.3.0",
     "tus-js-client": "^4.3.1",
-    "jszip": "^3.10.1",
-    "pdfjs-dist": "^5.4.296"
+    "vite": "^8.3.0"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.27.0",
+    "esbuild": "^0.28.1",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
-    "typescript": "^7.0.2",
-    "@types/express": "^4.17.21"
+    "typescript": "^7.0.2"
   }
 }
