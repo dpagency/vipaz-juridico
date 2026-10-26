@@ -1,6 +1,7 @@
 import * as tus from 'tus-js-client';
 import { supabase } from '../lib/supabase';
 import { normalizeAgravoFields } from '../domain/legal-engine/agravoQuality';
+import type { LegalIntakeSuggestion } from '../domain/legal-engine/legalIntake';
 
 export type LegalAiField =
  | 'appealed_decision' | 'executive_summary' | 'claim_summary' | 'controversy_delimitation'
@@ -8,6 +9,7 @@ export type LegalAiField =
  | 'appeal_periculum' | 'appeal_countersecurity' | 'appeal_final_requests';
 
 export type CompleteAppealDraft = Record<LegalAiField, string>;
+export type { LegalIntakeSuggestion } from '../domain/legal-engine/legalIntake';
 
 function safeFilename(name: string): string {
   return (name || 'autos.pdf')
@@ -99,6 +101,15 @@ export const legalAiService={
    const content=String(body.content||'').trim();
    if(!content) throw new Error('A geração assistida não retornou conteúdo utilizável.');
    return content;
+ },
+ async resolvePending(context:Record<string,unknown>,sourcePdf:File,organizationId:string,pendingFields:string[]):Promise<LegalIntakeSuggestion[]>{
+   if(!organizationId) throw new Error('Organização não identificada para a triagem assistida.');
+   const prepared=await this.prepareSource(sourcePdf,organizationId);
+   const response=await fetch('/api/ai/legal-intake',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${prepared.accessToken}`},body:JSON.stringify({context,pending_fields:pendingFields,source_pdf:prepared.sourcePdf})});
+   const body=await response.json().catch(()=>({}));
+   if(!response.ok) throw new Error(body?.error||`Falha na triagem assistida (HTTP ${response.status}).`);
+   if(!Array.isArray(body.suggestions)) throw new Error('A triagem assistida retornou um formato inválido.');
+   return body.suggestions as LegalIntakeSuggestion[];
  },
  async generateCompleteAppeal(context:Record<string,unknown>,sourcePdf:File,organizationId:string,onProgress?:(message:string,current:number,total:number)=>void):Promise<CompleteAppealDraft>{
    onProgress?.('Armazenando os autos com segurança…',0,9);

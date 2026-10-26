@@ -3,7 +3,7 @@
  * Pré-visualização determinística de blocos incluídos, excluídos e pedidos finais
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -18,8 +18,10 @@ import {
   X,
   Code2,
   Info,
+  Loader2,
 } from 'lucide-react';
 import { ResolvedDocumentAssembly, ValidationError } from '../domain/legal-engine/types';
+import type { LegalIntakeSuggestion } from '../services/legalAiService';
 
 interface MapaDaPecaModalProps {
   isOpen: boolean;
@@ -28,6 +30,11 @@ interface MapaDaPecaModalProps {
   errors: ValidationError[];
   onConfirmGenerate?: () => void;
   isGenerating?: boolean;
+  onResolveWithAi?: () => void;
+  onApplyAiSuggestions?: (fields: string[]) => void;
+  aiSuggestions?: LegalIntakeSuggestion[];
+  isResolvingWithAi?: boolean;
+  aiResolutionError?: string | null;
 }
 
 export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
@@ -37,9 +44,19 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
   errors,
   onConfirmGenerate,
   isGenerating = false,
+  onResolveWithAi,
+  onApplyAiSuggestions,
+  aiSuggestions = [],
+  isResolvingWithAi = false,
+  aiResolutionError = null,
 }) => {
   const [activeTab, setActiveTab] = useState<'flow' | 'requests' | 'variables'>('flow');
   const [expandedBlockKey, setExpandedBlockKey] = useState<string | null>(null);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedSuggestions(aiSuggestions.filter(item => item.status === 'suggested').map(item => item.field));
+  }, [aiSuggestions]);
 
   if (!isOpen) return null;
 
@@ -75,7 +92,7 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
 
   return (
     <div className="vipaz-map-modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-5xl bg-[#0B1120] border border-slate-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+      <div role="dialog" aria-modal="true" aria-labelledby="mapa-da-peca-title" className="relative w-full max-w-5xl bg-[#0B1120] border border-slate-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#0F172A]/80">
           <div className="flex items-center space-x-3">
@@ -84,7 +101,7 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="text-lg font-semibold text-white tracking-wide">
+                <h3 id="mapa-da-peca-title" className="text-lg font-semibold text-white tracking-wide">
                   Mapa da Peça — Motor Determinístico
                 </h3>
                 <span className="px-2 py-0.5 text-xs font-mono rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
@@ -97,6 +114,8 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Fechar mapa da peça"
             onClick={onClose}
             className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
           >
@@ -173,6 +192,23 @@ export const MapaDaPecaModal: React.FC<MapaDaPecaModalProps> = ({
 
         {/* Modal Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {errors.length > 0 && (
+            <section className="rounded-[5px] border border-cyan-500/25 bg-cyan-500/5 p-4 space-y-3" aria-label="Saneamento assistido das pendências">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div><h4 className="text-sm font-semibold text-white">Saneamento assistido pelos autos</h4><p className="mt-1 text-xs text-slate-400">A IA propõe respostas rastreáveis. Você decide o que será aplicado.</p></div>
+                {onResolveWithAi && <button type="button" onClick={onResolveWithAi} disabled={isResolvingWithAi} className="flex items-center justify-center gap-2 rounded-[5px] bg-cyan-400 px-4 py-2 text-xs font-semibold text-black disabled:opacity-50">{isResolvingWithAi?<Loader2 className="h-4 w-4 animate-spin"/>:<Sparkles className="h-4 w-4"/>}{isResolvingWithAi?'Analisando os autos…':'Resolver pendências com IA'}</button>}
+              </div>
+              {aiResolutionError && <p role="alert" className="rounded-[5px] border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">{aiResolutionError}</p>}
+              {!aiSuggestions.length && <div className="grid gap-2 sm:grid-cols-2">{errors.map(error=><div key={error.field} className="rounded-[5px] border border-slate-800 bg-black/20 p-3"><p className="font-mono text-[10px] text-cyan-400">{error.field}</p><p className="mt-1 text-xs text-slate-300">{error.message}</p></div>)}</div>}
+              {aiSuggestions.length > 0 && <div className="space-y-2">{aiSuggestions.map(item=>{
+                const available=item.status==='suggested'; const checked=selectedSuggestions.includes(item.field);
+                return <label key={item.field} className={`block rounded-[5px] border p-3 ${available?'border-slate-700 bg-[#0F172A]':'border-amber-500/25 bg-amber-500/5'}`}>
+                  <div className="flex items-start gap-3"><input type="checkbox" className="mt-1 accent-cyan-400" disabled={!available} checked={checked&&available} onChange={()=>setSelectedSuggestions(current=>checked?current.filter(field=>field!==item.field):[...current,item.field])}/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[10px] text-cyan-400">{item.field}</span><span className={`rounded px-1.5 py-0.5 text-[9px] uppercase ${item.confidence==='high'?'bg-emerald-500/15 text-emerald-300':item.confidence==='medium'?'bg-amber-500/15 text-amber-300':'bg-rose-500/15 text-rose-300'}`}>confiança {item.confidence}</span>{item.page&&<span className="text-[10px] text-slate-500">p. {item.page}</span>}</div><p className="mt-1 whitespace-pre-wrap text-xs text-white">{available?item.value:'Não localizado nos autos'}</p>{item.evidence&&<p className="mt-2 border-l-2 border-cyan-500/30 pl-2 text-[11px] text-slate-400">Evidência: {item.evidence}</p>}<p className="mt-1 text-[10px] text-slate-500">{item.explanation}</p></div></div>
+                </label>})}
+                {onApplyAiSuggestions&&<button type="button" disabled={!selectedSuggestions.length} onClick={()=>onApplyAiSuggestions(selectedSuggestions)} className="w-full rounded-[5px] border border-cyan-400/40 bg-cyan-400/10 px-4 py-2.5 text-xs font-semibold text-cyan-200 disabled:opacity-40">Aplicar {selectedSuggestions.length} proposta(s) selecionada(s)</button>}
+              </div>}
+            </section>
+          )}
           {activeTab === 'flow' && (
             <div className="space-y-3">
               <div className="text-xs text-slate-400 mb-2 flex items-center justify-between">

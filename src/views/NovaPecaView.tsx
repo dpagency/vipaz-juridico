@@ -55,9 +55,10 @@ import {
   HOMOLOGATED_CASE_DEFAULTS,
 } from '../domain/legal-engine/formDefinitions';
 import { isPieceHomologated } from '../domain/legal-engine/architectureRegistry';
-import { legalAiService, LegalAiField } from '../services/legalAiService';
+import { legalAiService, LegalAiField, type LegalIntakeSuggestion } from '../services/legalAiService';
 import { WorkspacePage, WorkspacePageHeader } from '../components/WorkspacePage';
 import { legalProductionService } from '../services/legalProductionService';
+import { applyLegalIntakeSuggestions } from '../domain/legal-engine/legalIntake';
 
 interface NovaPecaViewProps {
   organization: Organization;
@@ -123,6 +124,9 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
   const [isGeneratingCompleteAppeal, setIsGeneratingCompleteAppeal] = useState(false);
   const [completeAppealProgress, setCompleteAppealProgress] = useState('');
   const [aiFieldError, setAiFieldError] = useState<string | null>(null);
+  const [intakeSuggestions, setIntakeSuggestions] = useState<LegalIntakeSuggestion[]>([]);
+  const [isResolvingIntake, setIsResolvingIntake] = useState(false);
+  const [intakeResolutionError, setIntakeResolutionError] = useState<string | null>(null);
   const [approvedTemplates, setApprovedTemplates] = useState<DocumentTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [templateMessage, setTemplateMessage] = useState('Carregando modelos homologados…');
@@ -167,6 +171,28 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
   const countersecurityAllowed = Boolean(
     formData.dispute_objects.reajuste_anual || formData.dispute_objects.reajuste_etario
   );
+
+  const handleResolvePendingWithAi = async () => {
+    if(isResolvingIntake) return;
+    if(!selectedFile?.fileObj){setIntakeResolutionError('Anexe os autos em PDF antes de solicitar o saneamento assistido.');return;}
+    const pendingFields=Object.keys(clientErrors).filter(field=>field!=='submit'&&field!=='document_piece');
+    if(!pendingFields.length){setIntakeResolutionError('Não há pendências compatíveis para analisar.');return;}
+    setIsResolvingIntake(true);setIntakeResolutionError(null);setIntakeSuggestions([]);
+    try{
+      const suggestions=await legalAiService.resolvePending({organization_id:organization.id,document_piece:formData.document_piece,current_form:formData},selectedFile.fileObj,organization.id,pendingFields);
+      setIntakeSuggestions(suggestions);
+    }catch(error){setIntakeResolutionError(error instanceof Error?error.message:'Não foi possível analisar as pendências.');}
+    finally{setIsResolvingIntake(false);}
+  };
+
+  const handleApplyIntakeSuggestions = (fields:string[]) => {
+    setFormData(previous=>{
+      const next=applyLegalIntakeSuggestions(previous,intakeSuggestions,fields).data;
+      const check=ruleEngine.evaluate(next);const nextErrors:Record<string,string>={};check.errors.forEach(error=>{nextErrors[error.field]=error.message;});setClientErrors(nextErrors);
+      return next;
+    });
+    setIntakeSuggestions([]);setIntakeResolutionError(null);
+  };
 
   const handleGenerateAiField = async (field: LegalAiField) => {
     if (generatingAiField) return;
@@ -1706,6 +1732,11 @@ export const NovaPecaView: React.FC<NovaPecaViewProps> = ({
           }
         }}
         isGenerating={isSubmitting}
+        onResolveWithAi={handleResolvePendingWithAi}
+        onApplyAiSuggestions={handleApplyIntakeSuggestions}
+        aiSuggestions={intakeSuggestions}
+        isResolvingWithAi={isResolvingIntake}
+        aiResolutionError={intakeResolutionError}
       />
     </WorkspacePage>
   );

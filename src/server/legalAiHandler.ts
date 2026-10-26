@@ -1,6 +1,26 @@
 import type { Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { generateText } from 'ai';
+import { generateText, Output } from 'ai';
+import { z } from 'zod';
+
+const INTAKE_FIELDS = [
+  'process_number','court_number','court_type','court_type_custom','district','uf','client','opposing_party',
+  'executive_summary','claim_summary','controversy_delimitation','adverse_party_nature','dispute_objects',
+  'dispute_objects.outro_descricao','appeal_demand_type','appeal_main_object','appealed_decision','appeal_initial_claim',
+  'appeal_relevant_documents','appeal_contractual_documents','appeal_procedural_history','appeal_specific_instructions',
+  'appeal_effect_suspensive','appeal_mistaken_premise','appeal_fumus','appeal_periculum','appeal_countersecurity',
+  'appeal_final_requests',
+] as const;
+
+const intakeSuggestionSchema = z.object({
+  field: z.enum(INTAKE_FIELDS),
+  status: z.enum(['suggested','not_found']),
+  value: z.string(),
+  confidence: z.enum(['high','medium','low']),
+  evidence: z.string(),
+  page: z.number().int().positive().nullable(),
+  explanation: z.string(),
+});
 
 const ALLOWED_FIELDS = new Set([
   'appealed_decision',
@@ -168,5 +188,51 @@ export async function handleLegalAiField(req:Request,res:Response) {
     const message=error instanceof Error ? error.message : '';
     if(/credit|payment|quota|rate limit/i.test(message)) return res.status(503).json({error:'O serviço de IA está temporariamente sem cota disponível. Tente novamente em instantes.'});
     return res.status(500).json({error:'Não foi possível concluir a assistência por IA.'});
+  }
+}
+
+export async function handleLegalAiIntake(req:Request,res:Response) {
+  try {
+    if (!(await validateSession(req))) return res.status(401).json({error:'Sessão inválida ou expirada.'});
+    const {context,source_pdf,pending_fields}=req.body||{};
+    const requested = Array.isArray(pending_fields)
+      ? [...new Set(pending_fields.filter((field:unknown):field is typeof INTAKE_FIELDS[number] => typeof field==='string' && (INTAKE_FIELDS as readonly string[]).includes(field)))]
+      : [];
+    if(!requested.length) return res.status(400).json({error:'Nenhuma pendência compatível foi informada.'});
+    if(!source_pdf?.storage_path || source_pdf?.mime_type!=='application/pdf') return res.status(400).json({error:'Anexe os autos processuais em PDF antes da análise assistida.'});
+    if(!isStoragePathAllowed(source_pdf.storage_path,context?.organization_id)) return res.status(403).json({error:'Caminho dos autos não autorizado para esta organização.'});
+    const storageClient=getAuthenticatedSupabase(req);
+    if(!storageClient) return res.status(401).json({error:'Sessão inválida ou expirada.'});
+    const {data:signedData,error:signedError}=await storageClient.storage.from('source-documents').createSignedUrl(source_pdf.storage_path,600);
+    if(signedError||!signedData?.signedUrl) return res.status(502).json({error:'Não foi possível autorizar o acesso temporário aos autos.'});
+
+    const {output}=await generateText({
+      model:process.env.AI_GATEWAY_MODEL||'google/gemini-2.5-flash',
+      output:Output.object({schema:z.object({suggestions:z.array(intakeSuggestionSchema)}),name:'legal_intake_resolution',description:'Propostas rastreáveis para pendências do formulário jurídico.'}),
+      system:`Você é o assistente de triagem controlada do VIPAZ Jurídico. Analise exclusivamente os autos fornecidos e proponha uma resposta para cada campo solicitado.
+REGRAS ABSOLUTAS:
+- Retorne exatamente uma entrada para cada campo solicitado e nenhuma entrada adicional.
+- Nunca invente. Se não houver suporte expresso nos autos, use status not_found, value vazio, confidence low e explique a ausência.
+- evidence deve ser um trecho curto ou descrição objetiva do ponto encontrado; page deve indicar a página do PDF quando identificável.
+- Para process_number use CNJ; court_number somente algarismos; court_type somente Vara Cível, Juizado Especial Cível ou Outro; uf somente RJ, SP, MG ou BA.
+- adverse_party_nature: value deve ser pf, pj ou pf,pj.
+- dispute_objects: value deve ser lista separada por vírgulas entre reajuste_anual_pme, reajuste_anual_individual, reajuste_etario_pme, reajuste_etario_individual, aviso_previo, premio_complementar, outro.
+- Nos campos jurídicos extensos, produza texto limpo, tecnicamente prudente, sem referências artificiais, sem reticências e com um período por parágrafo, exceto na ementa.
+- A ementa deve ter até 2.000 caracteres, abertura em caixa alta e itens numerados.
+- Autor, réu, juízo, agravante e agravado devem ter iniciais minúsculas quando substantivos comuns.
+- Contracautela somente quando os autos tratarem de reajuste.`,
+      messages:[{role:'user',content:[
+        {type:'text',text:`CAMPOS PENDENTES:\n${requested.join('\n')}\n\nCONTEXTO JÁ INFORMADO:\n${JSON.stringify(context??{},null,2)}`},
+        {type:'file',data:signedData.signedUrl,mediaType:'application/pdf',filename:source_pdf.name||'autos.pdf'},
+      ]}],
+      maxOutputTokens:12000,
+      temperature:0.1,
+    });
+    const byField=new Map(output.suggestions.map(item=>[item.field,item]));
+    const suggestions=requested.map(field=>byField.get(field)||{field,status:'not_found' as const,value:'',confidence:'low' as const,evidence:'',page:null,explanation:'A IA não retornou proposta para esta pendência.'});
+    return res.json({suggestions});
+  } catch(error){
+    console.error('[VIPAZ][LegalAI][Intake]',error);
+    return res.status(500).json({error:'Não foi possível analisar as pendências com IA.'});
   }
 }

@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import 'dotenv/config';
 import { handleGenerateDocx } from './src/server/generateDocxHandler';
-import { handleLegalAiField } from './src/server/legalAiHandler';
+import { handleLegalAiField, handleLegalAiIntake } from './src/server/legalAiHandler';
 import { handleStartGeneration } from './src/server/startGenerationHandler';
 import { handleVipazDeliveryReview } from './src/server/vipazDeliveryReviewHandler';
 
@@ -33,6 +33,10 @@ async function startServer() {
   // Assistência por IA para campos editáveis das peças jurídicas
   app.post('/api/ai/legal-field', (req, res) => {
     handleLegalAiField(req, res);
+  });
+
+  app.post('/api/ai/legal-intake', (req, res) => {
+    handleLegalAiIntake(req, res);
   });
 
   app.post('/api/start-generation', (req, res) => {
