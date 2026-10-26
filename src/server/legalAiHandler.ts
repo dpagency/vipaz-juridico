@@ -184,11 +184,20 @@ export async function handleLegalAiField(req:Request,res:Response) {
     if(!content) return res.status(502).json({error:'O motor de IA não retornou conteúdo utilizável.'});
     return res.json({content});
   } catch(error){
-    console.error('[VIPAZ][LegalAI] erro:',error);
+    console.error('[VIPAZ][LegalAI]',getSafeAiErrorDetails(error));
     const message=error instanceof Error ? error.message : '';
     if(/credit|payment|quota|rate limit/i.test(message)) return res.status(503).json({error:'O serviço de IA está temporariamente sem cota disponível. Tente novamente em instantes.'});
     return res.status(500).json({error:'Não foi possível concluir a assistência por IA.'});
   }
+}
+
+function getSafeAiErrorDetails(error:unknown) {
+  const candidate = error && typeof error === 'object' ? error as Record<string,unknown> : {};
+  return {
+    name: error instanceof Error ? error.name : 'UnknownError',
+    message: error instanceof Error ? error.message : 'Erro desconhecido',
+    finishReason: typeof candidate.finishReason === 'string' ? candidate.finishReason : undefined,
+  };
 }
 
 export async function handleLegalAiIntake(req:Request,res:Response) {
@@ -214,10 +223,12 @@ REGRAS ABSOLUTAS:
 - Retorne exatamente uma entrada para cada campo solicitado e nenhuma entrada adicional.
 - Nunca invente. Se não houver suporte expresso nos autos, use status not_found, value vazio, confidence low e explique a ausência.
 - evidence deve ser um trecho curto ou descrição objetiva do ponto encontrado; page deve indicar a página do PDF quando identificável.
+- evidence deve ter no máximo 500 caracteres e explanation no máximo 300 caracteres.
 - Para process_number use CNJ; court_number somente algarismos; court_type somente Vara Cível, Juizado Especial Cível ou Outro; uf somente RJ, SP, MG ou BA.
 - adverse_party_nature: value deve ser pf, pj ou pf,pj.
 - dispute_objects: value deve ser lista separada por vírgulas entre reajuste_anual_pme, reajuste_anual_individual, reajuste_etario_pme, reajuste_etario_individual, aviso_previo, premio_complementar, outro.
 - Nos campos jurídicos extensos, produza texto limpo, tecnicamente prudente, sem referências artificiais, sem reticências e com um período por parágrafo, exceto na ementa.
+- Nesta etapa de saneamento, limite cada campo jurídico extenso a 3.500 caracteres. A redação integral será produzida depois, campo a campo.
 - A ementa deve ter até 2.000 caracteres, abertura em caixa alta e itens numerados.
 - Autor, réu, juízo, agravante e agravado devem ter iniciais minúsculas quando substantivos comuns.
 - Contracautela somente quando os autos tratarem de reajuste.`,
@@ -225,14 +236,19 @@ REGRAS ABSOLUTAS:
         {type:'text',text:`CAMPOS PENDENTES:\n${requested.join('\n')}\n\nCONTEXTO JÁ INFORMADO:\n${JSON.stringify(context??{},null,2)}`},
         {type:'file',data:signedData.signedUrl,mediaType:'application/pdf',filename:source_pdf.name||'autos.pdf'},
       ]}],
-      maxOutputTokens:12000,
+      reasoning:'none',
+      maxOutputTokens:20000,
       temperature:0.1,
     });
     const byField=new Map(output.suggestions.map(item=>[item.field,item]));
     const suggestions=requested.map(field=>byField.get(field)||{field,status:'not_found' as const,value:'',confidence:'low' as const,evidence:'',page:null,explanation:'A IA não retornou proposta para esta pendência.'});
     return res.json({suggestions});
   } catch(error){
-    console.error('[VIPAZ][LegalAI][Intake]',error);
+    const details=getSafeAiErrorDetails(error);
+    console.error('[VIPAZ][LegalAI][Intake]',details);
+    if(/No object generated|parse|length|trunc/i.test(`${details.name} ${details.message} ${details.finishReason||''}`)) {
+      return res.status(502).json({error:'A resposta da IA foi interrompida antes de concluir a análise. Tente novamente; se persistir, analise menos pendências por vez.'});
+    }
     return res.status(500).json({error:'Não foi possível analisar as pendências com IA.'});
   }
 }
